@@ -523,8 +523,8 @@ export class LanhuParser {
       fills.push({ type: 'solid', color: this.colorToHex(layer.fill.color) });
     }
 
-    if (layer.fill?.gradientFill) {
-      const gradient = this.extractGradient(layer.fill, layer.fill.gradientFill);
+    if (layer.fill?.gradientFill || layer.fill?.gradient || layer.fill?.class === 'gradientLayer') {
+      const gradient = this.extractGradient(layer.fill);
       if (gradient) {
         fills.push({ type: 'gradient', gradient });
       }
@@ -537,19 +537,30 @@ export class LanhuParser {
     return fills.length > 0 ? fills : undefined;
   }
 
-  private extractGradient(fill: LanhuFill, gradientFill: LanhuGradientFill): SimplifiedGradient | undefined {
-    const stops = gradientFill.gradient?.colors || gradientFill.colors;
+  private extractGradient(fill: LanhuFill, gradientFill?: LanhuGradientFill): SimplifiedGradient | undefined {
+    const source = gradientFill || fill.gradientFill;
+    const gradientSource = (fill.gradient || source?.gradient) as ({
+      type?: string;
+      angle?: number;
+      colors?: Array<{
+        location?: number;
+        color?: LanhuColor;
+        opacity?: { value: number; units: string };
+      }>;
+    } | undefined);
+    const stops = gradientSource?.colors || source?.colors;
+    const transparencies = fill.gradient?.transparency;
     if (!stops || stops.length === 0) {
       return undefined;
     }
 
     return {
-      type: gradientFill.gradient?.type || gradientFill.type || gradientFill.gradientForm || fill.class || 'linear',
-      angle: gradientFill.gradient?.angle || gradientFill.angle,
+      type: gradientSource?.type || source?.type || fill.type || fill.gradient?.gradientForm || source?.gradientForm || fill.class || 'linear',
+      angle: (typeof source?.angle === 'number' ? source.angle : fill.angle?.value) || undefined,
       stops: stops.map((stop, index) => ({
         position: typeof stop.location === 'number' ? stop.location / 4096 : index / Math.max(stops.length - 1, 1),
         color: stop.color ? this.colorToHex(stop.color) : '#000000',
-        opacity: stop.opacity ? stop.opacity.value / 100 : undefined,
+        opacity: stop.opacity ? stop.opacity.value / 100 : transparencies?.[index]?.opacity ? transparencies[index].opacity.value / 100 : undefined,
       })),
     };
   }
@@ -580,6 +591,9 @@ export class LanhuParser {
   private getOpacity(layer: LanhuLayer): number | undefined {
     if (layer.blendOptions?.opacity) {
       return layer.blendOptions.opacity.value / 100;
+    }
+    if (layer.blendOptions?.fillOpacity) {
+      return layer.blendOptions.fillOpacity.value / 100;
     }
     if (layer.layerEffects?.solidFill?.opacity) {
       return layer.layerEffects.solidFill.opacity.value / 100;

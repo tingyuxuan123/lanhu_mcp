@@ -83,6 +83,19 @@ export interface LanhuFill {
   color?: LanhuColor;
   class?: string;
   gradientFill?: LanhuGradientFill;
+  angle?: LanhuUnitValue;
+  type?: string;
+  gradient?: {
+    name?: string;
+    gradientForm?: string;
+    interfaceIconFrameDimmed?: number;
+    colors?: LanhuGradientStop[];
+    transparency?: Array<{
+      opacity?: LanhuUnitValue;
+      location?: number;
+      midpoint?: number;
+    }>;
+  };
 }
 
 export interface LanhuStrokeStyle {
