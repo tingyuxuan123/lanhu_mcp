@@ -1,20 +1,12 @@
-/**
- * 样式提取服务
- * 将蓝湖图层样式转换为 CSS/组件代码
+﻿/**
+ * Style extraction helpers.
  */
 
 import type { SimplifiedLayer } from '../types/lanhu.js';
 
 export type OutputFormat = 'css' | 'tailwind' | 'react' | 'vue';
 
-/**
- * 样式提取器
- */
 export class StyleExtractor {
-
-  /**
-   * 从蓝湖图层树节点提取样式
-   */
   extractFromLanhuNode(node: SimplifiedLayer, format: OutputFormat = 'css'): string {
     switch (format) {
       case 'tailwind':
@@ -29,119 +21,154 @@ export class StyleExtractor {
     }
   }
 
-  /**
-   * 转换为 CSS
-   */
   private lanhuNodeToCSS(node: SimplifiedLayer): string {
-    const lines: string[] = [];
     const className = this.toClassName(node.name);
+    const lines: string[] = [];
 
     lines.push(`/* ${node.name} (${node.type}) */`);
     lines.push(`.${className} {`);
-    lines.push(`  /* 位置: ${node.bounds.x}, ${node.bounds.y} */`);
+    lines.push('  position: absolute;');
+    lines.push(`  left: ${node.bounds.x}px;`);
+    lines.push(`  top: ${node.bounds.y}px;`);
     lines.push(`  width: ${node.bounds.width}px;`);
     lines.push(`  height: ${node.bounds.height}px;`);
 
-    // 填充
-    if (node.fill) {
-      lines.push(`  background-color: ${node.fill};`);
+    if (node.opacity !== undefined) {
+      lines.push(`  opacity: ${node.opacity};`);
     }
 
-    // 边框
+    if (node.assetUrl) {
+      lines.push(`  background-image: url('${node.assetUrl}');`);
+      lines.push('  background-repeat: no-repeat;');
+      lines.push('  background-position: center;');
+      lines.push('  background-size: contain;');
+    } else if (node.fill) {
+      if (node.fill.startsWith('linear-gradient') || node.fill.startsWith('radial-gradient')) {
+        lines.push(`  background-image: ${node.fill};`);
+      } else {
+        lines.push(`  background-color: ${node.fill};`);
+      }
+    }
+
     if (node.stroke) {
       lines.push(`  border: ${node.stroke.width}px solid ${node.stroke.color};`);
     }
 
-    // 文本样式
+    if (node.borderRadius !== undefined) {
+      const radius = Array.isArray(node.borderRadius)
+        ? node.borderRadius.map(value => `${value}px`).join(' ')
+        : `${node.borderRadius}px`;
+      lines.push(`  border-radius: ${radius};`);
+    }
+
+    if (node.shadows && node.shadows.length > 0) {
+      const shadowValue = node.shadows
+        .map(shadow => `${shadow.type === 'innerShadow' ? 'inset ' : ''}${shadow.x}px ${shadow.y}px ${shadow.blur}px ${shadow.spread}px ${shadow.color}`)
+        .join(', ');
+      lines.push(`  box-shadow: ${shadowValue};`);
+    }
+
     if (node.textStyle) {
-      const ts = node.textStyle;
-      lines.push(`  font-size: ${ts.fontSize}px;`);
-      if (ts.fontFamily) lines.push(`  font-family: '${ts.fontFamily}';`);
-      if (ts.color) lines.push(`  color: ${ts.color};`);
-      if (ts.alignment) lines.push(`  text-align: ${ts.alignment};`);
+      const style = node.textStyle;
+      lines.push(`  font-size: ${style.fontSize}px;`);
+      lines.push(`  font-family: '${style.fontFamily}';`);
+      lines.push(`  font-weight: ${style.fontWeight || 400};`);
+      lines.push(`  font-style: ${style.fontStyle || 'normal'};`);
+      lines.push(`  color: ${style.color};`);
+      lines.push(`  text-align: ${style.alignment};`);
+      if (style.lineHeight) {
+        lines.push(`  line-height: ${style.lineHeight}px;`);
+      }
+      if (style.letterSpacing !== undefined) {
+        lines.push(`  letter-spacing: ${style.letterSpacing}px;`);
+      }
     }
 
     lines.push('}');
     return lines.join('\n');
   }
 
-  /**
-   * 转换为 Tailwind 类名
-   */
   private lanhuNodeToTailwind(node: SimplifiedLayer): string {
-    const classes: string[] = [];
+    const classes: string[] = [
+      'absolute',
+      `left-[${node.bounds.x}px]`,
+      `top-[${node.bounds.y}px]`,
+      `w-[${node.bounds.width}px]`,
+      `h-[${node.bounds.height}px]`,
+    ];
 
-    // 尺寸
-    classes.push(`w-[${node.bounds.width}px]`);
-    classes.push(`h-[${node.bounds.height}px]`);
-
-    // 填充
-    if (node.fill) {
+    if (node.fill && !node.fill.startsWith('linear-gradient') && !node.fill.startsWith('radial-gradient')) {
       classes.push(`bg-[${node.fill}]`);
     }
 
-    // 边框
     if (node.stroke) {
       classes.push(`border-[${node.stroke.width}px]`);
       classes.push(`border-[${node.stroke.color}]`);
     }
 
-    // 文本样式
-    if (node.textStyle) {
-      const ts = node.textStyle;
-      classes.push(`text-[${ts.fontSize}px]`);
-      if (ts.color) classes.push(`text-[${ts.color}]`);
-      if (ts.alignment === 'center') classes.push('text-center');
-      if (ts.alignment === 'right') classes.push('text-right');
+    if (typeof node.borderRadius === 'number') {
+      classes.push(`rounded-[${node.borderRadius}px]`);
     }
 
-    const content = node.text || '';
-    return `<!-- ${node.name} (${node.type}) -->\n<div class="${classes.join(' ')}">${content}</div>`;
+    if (node.textStyle) {
+      const style = node.textStyle;
+      classes.push(`text-[${style.fontSize}px]`);
+      classes.push(`text-[${style.color}]`);
+      if (style.alignment === 'center') classes.push('text-center');
+      if (style.alignment === 'right') classes.push('text-right');
+    }
+
+    return `<!-- ${node.name} (${node.type}) -->\n<div class="${classes.join(' ')}">${node.text || ''}</div>`;
   }
 
-  /**
-   * 转换为 React 组件
-   */
   private lanhuNodeToReact(node: SimplifiedLayer): string {
-    const componentName = this.toComponentName(node.name);
-    const className = this.toClassName(node.name);
-
-    return `// ${node.name} (${node.type})
-// Position: (${node.bounds.x}, ${node.bounds.y})
-// Size: ${node.bounds.width}x${node.bounds.height}
-export function ${componentName}() {
-  return (
-    <div className="${className}" style={{ width: ${node.bounds.width}, height: ${node.bounds.height} }}>
-      ${node.text || '/* content */'}
-    </div>
-  );
-}`;
+    const style = this.toInlineStyle(node);
+    return `// ${node.name} (${node.type})\nexport function ${this.toComponentName(node.name)}() {\n  return (\n    <div style={${style}}>\n      ${node.text || ''}\n    </div>\n  );\n}`;
   }
 
-  /**
-   * 转换为 Vue 组件
-   */
   private lanhuNodeToVue(node: SimplifiedLayer): string {
-    const componentName = this.toComponentName(node.name);
-    const className = this.toClassName(node.name);
-
-    return `<!-- ${node.name} (${node.type}) -->
-<!-- Position: (${node.bounds.x}, ${node.bounds.y}) -->
-<!-- Size: ${node.bounds.width}x${node.bounds.height} -->
-<template>
-  <div class="${className}" :style="{ width: '${node.bounds.width}px', height: '${node.bounds.height}px' }">
-    ${node.text || '<slot></slot>'}
-  </div>
-</template>
-
-<script setup>
-defineOptions({ name: '${componentName}' });
-</script>`;
+    const style = this.toInlineStyle(node);
+    return `<!-- ${node.name} (${node.type}) -->\n<template>\n  <div :style="${style}">${node.text || ''}</div>\n</template>\n\n<script setup>\ndefineOptions({ name: '${this.toComponentName(node.name)}' });\n</script>`;
   }
 
-  /**
-   * 名称转 CSS 类名
-   */
+  private toInlineStyle(node: SimplifiedLayer): string {
+    const style: Record<string, string | number> = {
+      position: 'absolute',
+      left: `${node.bounds.x}px`,
+      top: `${node.bounds.y}px`,
+      width: `${node.bounds.width}px`,
+      height: `${node.bounds.height}px`,
+    };
+
+    if (node.opacity !== undefined) style.opacity = node.opacity;
+    if (node.assetUrl) {
+      style.backgroundImage = `url(${node.assetUrl})`;
+      style.backgroundRepeat = 'no-repeat';
+      style.backgroundPosition = 'center';
+      style.backgroundSize = 'contain';
+    } else if (node.fill) {
+      if (node.fill.startsWith('linear-gradient') || node.fill.startsWith('radial-gradient')) {
+        style.backgroundImage = node.fill;
+      } else {
+        style.backgroundColor = node.fill;
+      }
+    }
+    if (node.stroke) style.border = `${node.stroke.width}px solid ${node.stroke.color}`;
+    if (typeof node.borderRadius === 'number') style.borderRadius = `${node.borderRadius}px`;
+    if (node.textStyle) {
+      style.fontSize = `${node.textStyle.fontSize}px`;
+      style.fontFamily = node.textStyle.fontFamily;
+      style.fontWeight = node.textStyle.fontWeight || 400;
+      style.fontStyle = node.textStyle.fontStyle || 'normal';
+      style.color = node.textStyle.color;
+      style.textAlign = node.textStyle.alignment;
+      if (node.textStyle.lineHeight) style.lineHeight = `${node.textStyle.lineHeight}px`;
+      if (node.textStyle.letterSpacing !== undefined) style.letterSpacing = `${node.textStyle.letterSpacing}px`;
+    }
+
+    return JSON.stringify(style, null, 2);
+  }
+
   private toClassName(name: string): string {
     return name
       .toLowerCase()
@@ -150,43 +177,34 @@ defineOptions({ name: '${componentName}' });
       .substring(0, 50) || 'layer';
   }
 
-  /**
-   * 名称转组件名
-   */
   private toComponentName(name: string): string {
     return name
       .split(/[^a-zA-Z0-9]+/)
+      .filter(Boolean)
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join('')
       .substring(0, 50) || 'Layer';
   }
 
-  /**
-   * 批量提取样式（从蓝湖图层树）
-   */
   extractBatchFromLanhu(layers: SimplifiedLayer[], format: OutputFormat = 'css'): string {
     const results: string[] = [];
 
-    const traverse = (nodes: SimplifiedLayer[], depth: number = 0) => {
+    const walk = (nodes: SimplifiedLayer[]) => {
       for (const node of nodes) {
-        const indent = '  '.repeat(depth);
-        results.push(`${indent}${this.extractFromLanhuNode(node, format)}`);
-
+        results.push(this.extractFromLanhuNode(node, format));
         if (node.children && node.children.length > 0) {
-          traverse(node.children, depth + 1);
+          walk(node.children);
         }
       }
     };
 
-    traverse(layers);
+    walk(layers);
     return results.join('\n\n');
   }
 
-  // 保留旧方法以兼容
-  extractBatch(layers: any[], format: OutputFormat = 'css'): string {
-    return this.extractBatchFromLanhu(layers as SimplifiedLayer[], format);
+  extractBatch(layers: SimplifiedLayer[], format: OutputFormat = 'css'): string {
+    return this.extractBatchFromLanhu(layers, format);
   }
 }
 
-// 单例实例
 export const styleExtractor = new StyleExtractor();

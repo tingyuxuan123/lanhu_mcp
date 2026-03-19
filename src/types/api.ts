@@ -1,19 +1,13 @@
-/**
- * 蓝湖 API 响应类型定义
+﻿/**
+ * Lanhu API response types.
  */
 
-/**
- * 蓝湖 API 通用响应结构
- */
 export interface LanhuApiResponse<T> {
   code: string;
   msg?: string;
   result: T;
 }
 
-/**
- * 设计图版本信息
- */
 export interface ImageVersion {
   id: string;
   type: 'image';
@@ -35,9 +29,6 @@ export interface ImageVersion {
   comments: unknown[];
 }
 
-/**
- * 设计图信息响应
- */
 export interface ImageResult {
   batch: string;
   category_cover: unknown[];
@@ -73,43 +64,82 @@ export interface ImageResult {
   width: number;
 }
 
-/**
- * 设计图基本信息（简化版，用于工具返回）
- */
+export interface DesignVersionSummary {
+  id: string;
+  versionInfo: string;
+  jsonUrl: string;
+  imageUrl: string;
+  width: number;
+  height: number;
+  createTime: string;
+  updated: boolean;
+}
+
 export interface DesignInfo {
   id: string;
   name: string;
   width: number;
   height: number;
   latestVersion: string;
-  versions: {
-    id: string;
-    versionInfo: string;
-    jsonUrl: string;
-    width: number;
-    height: number;
-  }[];
+  latestVersionInfo: DesignVersionSummary | null;
+  latestJsonUrl: string | null;
+  latestImageUrl: string | null;
+  versions: DesignVersionSummary[];
   createTime: string;
   updateTime: string;
 }
 
-/**
- * 从 ImageResult 提取简化信息
- */
+export function getLatestVersion(result: ImageResult): ImageVersion | null {
+  const matched = result.versions.find(version => version.id === result.latest_version);
+  if (matched) {
+    return matched;
+  }
+
+  if (result.versions.length === 0) {
+    return null;
+  }
+
+  return [...result.versions].sort((left, right) => {
+    const leftTime = Date.parse(left.create_time);
+    const rightTime = Date.parse(right.create_time);
+    return Number.isNaN(rightTime) || Number.isNaN(leftTime) ? 0 : rightTime - leftTime;
+  })[0];
+}
+
 export function extractDesignInfo(result: ImageResult): DesignInfo {
+  const latestVersion = getLatestVersion(result);
+  const versions: DesignVersionSummary[] = result.versions.map(version => ({
+    id: version.id,
+    versionInfo: version.version_info,
+    jsonUrl: version.json_url,
+    imageUrl: version.url,
+    width: version.width,
+    height: version.height,
+    createTime: version.create_time,
+    updated: version.updated,
+  }));
+
   return {
     id: result.id,
     name: result.name,
     width: result.width,
     height: result.height,
     latestVersion: result.latest_version,
-    versions: result.versions.map(v => ({
-      id: v.id,
-      versionInfo: v.version_info,
-      jsonUrl: v.json_url,
-      width: v.width,
-      height: v.height,
-    })),
+    latestVersionInfo: latestVersion
+      ? {
+          id: latestVersion.id,
+          versionInfo: latestVersion.version_info,
+          jsonUrl: latestVersion.json_url,
+          imageUrl: latestVersion.url,
+          width: latestVersion.width,
+          height: latestVersion.height,
+          createTime: latestVersion.create_time,
+          updated: latestVersion.updated,
+        }
+      : null,
+    latestJsonUrl: latestVersion?.json_url ?? null,
+    latestImageUrl: latestVersion?.url ?? null,
+    versions,
     createTime: result.create_time,
     updateTime: result.update_time,
   };

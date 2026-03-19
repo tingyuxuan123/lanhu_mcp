@@ -1,11 +1,7 @@
-/**
- * 蓝湖 Sketch JSON 数据结构类型定义
- * 这是蓝湖特有的格式，不同于标准 Sketch 格式
+﻿/**
+ * Lanhu design document types and normalized restoration models.
  */
 
-/**
- * 蓝湖颜色（RGB 0-255 范围）
- */
 export interface LanhuColor {
   red?: number;
   green?: number;
@@ -16,9 +12,6 @@ export interface LanhuColor {
   alpha?: number;
 }
 
-/**
- * 边界信息
- */
 export interface LanhuBounds {
   top: number;
   left: number;
@@ -26,9 +19,6 @@ export interface LanhuBounds {
   right: number;
 }
 
-/**
- * 艺术板矩形
- */
 export interface LanhuArtboardRect {
   top: number;
   left: number;
@@ -36,25 +26,24 @@ export interface LanhuArtboardRect {
   right: number;
 }
 
-/**
- * 文本样式范围
- */
+export interface LanhuUnitValue {
+  value: number;
+  units: string;
+}
+
 export interface LanhuTextStyleRange {
   from: number;
   to: number;
   textStyle: {
-    fontName: string;
-    fontStyleName: string;
-    size: number;
-    fontPostScriptName: string;
+    fontName?: string;
+    fontStyleName?: string;
+    size?: number;
+    fontPostScriptName?: string;
     color?: LanhuColor;
     fontTechnology?: number;
   };
 }
 
-/**
- * 文本信息
- */
 export interface LanhuTextInfo {
   text: string;
   color?: LanhuColor;
@@ -71,30 +60,58 @@ export interface LanhuTextInfo {
   bounds?: LanhuBounds;
 }
 
-/**
- * 填充样式
- */
+export interface LanhuGradientStop {
+  location?: number;
+  midpoint?: number;
+  color?: LanhuColor;
+  opacity?: LanhuUnitValue;
+}
+
+export interface LanhuGradientFill {
+  type?: string;
+  angle?: number;
+  gradientForm?: string;
+  gradient?: {
+    type?: string;
+    angle?: number;
+    colors?: LanhuGradientStop[];
+  };
+  colors?: LanhuGradientStop[];
+}
+
 export interface LanhuFill {
   color?: LanhuColor;
   class?: string;
+  gradientFill?: LanhuGradientFill;
 }
 
-/**
- * 描边样式
- */
 export interface LanhuStrokeStyle {
   strokeStyleVersion?: number;
   strokeEnabled?: boolean;
   fillEnabled?: boolean;
   strokeStyleLineWidth?: number;
+  strokeStyleLineAlignment?: string;
+  strokeStyleOpacity?: LanhuUnitValue;
   strokeStyleContent?: {
     color?: LanhuColor;
   };
 }
 
-/**
- * 图层效果
- */
+export interface LanhuShadowEffect {
+  enabled?: boolean;
+  present?: boolean;
+  showInDialog?: boolean;
+  mode?: string;
+  color?: LanhuColor;
+  opacity?: LanhuUnitValue;
+  useGlobalAngle?: boolean;
+  localLightingAngle?: LanhuUnitValue;
+  distance?: number;
+  chokeMatte?: number;
+  blur?: number;
+  layerConceals?: boolean;
+}
+
 export interface LanhuLayerEffects {
   solidFill?: {
     enabled: boolean;
@@ -102,22 +119,19 @@ export interface LanhuLayerEffects {
     showInDialog: boolean;
     mode: string;
     color: LanhuColor;
-    opacity: { value: number; units: string };
+    opacity: LanhuUnitValue;
   };
+  masterFXSwitch?: boolean;
+  dropShadow?: LanhuShadowEffect;
+  innerShadow?: LanhuShadowEffect;
 }
 
-/**
- * 混合选项
- */
 export interface LanhuBlendOptions {
   mode?: string;
-  fillOpacity?: { value: number; units: string };
-  opacity?: { value: number; units: string };
+  fillOpacity?: LanhuUnitValue;
+  opacity?: LanhuUnitValue;
 }
 
-/**
- * 路径组件
- */
 export interface LanhuPathComponent {
   shapeOperation?: string;
   subpathListKey?: Array<{
@@ -126,69 +140,68 @@ export interface LanhuPathComponent {
       anchor: { x: number; y: number };
       forward: { x: number; y: number };
       backward: { x: number; y: number };
-      smooth: boolean;
+      smooth?: boolean;
     }>;
   }>;
+  origin?: {
+    type?: string;
+    bounds?: LanhuBounds;
+    radii?: number[];
+  };
 }
 
-/**
- * 图层类型
- */
 export type LanhuLayerType =
   | 'artboardSection'
   | 'layerSection'
   | 'layer'
   | 'textLayer'
   | 'shapeLayer'
-  | 'smartObjectLayer';
+  | 'smartObjectLayer'
+  | 'adjustmentLayer';
 
-/**
- * 蓝湖图层
- */
 export interface LanhuLayer {
   id: number;
+  index?: number;
   type: LanhuLayerType;
   name: string;
   visible: boolean;
   clipped: boolean;
   layers?: LanhuLayer[];
+  bounds?: LanhuBounds;
   boundsWithFX?: LanhuBounds;
   _orgBounds?: LanhuBounds;
   width?: number;
   height?: number;
   top?: number;
   left?: number;
-
-  // 文本图层特有
   text?: boolean;
   textInfo?: LanhuTextInfo;
-
-  // 形状图层特有
   fill?: LanhuFill;
   strokeStyle?: LanhuStrokeStyle;
-  path?: { pathComponents: LanhuPathComponent[] };
-
-  // 普通图层特有
+  path?: {
+    pathComponents?: LanhuPathComponent[];
+    bounds?: LanhuBounds;
+    defaultFill?: boolean;
+  };
   layerEffects?: LanhuLayerEffects;
   pixels?: boolean;
   blendOptions?: LanhuBlendOptions;
-
-  // 其他
   generatorSettings?: boolean;
   isAsset?: boolean;
   isSlice?: boolean;
+  isClippingMask?: boolean;
+  images?: Record<string, string>;
+  ddsImages?: Record<string, string>;
+  blur?: Record<string, unknown>;
+  adjustment?: Record<string, unknown>;
+  mask?: Record<string, unknown>;
+  beforeClippedFrame?: LanhuBounds;
 }
 
-/**
- * 艺术板信息
- */
 export interface LanhuArtboard {
   artboardRect: LanhuArtboardRect;
 }
 
-/**
- * 蓝湖画板（文档根节点）
- */
 export interface LanhuBoard {
   id: number;
   index?: number;
@@ -201,45 +214,141 @@ export interface LanhuBoard {
   layers: LanhuLayer[];
 }
 
-/**
- * 蓝湖文档
- */
-export interface LanhuDocument {
-  board: LanhuBoard;
+export interface LanhuAssetSummary {
+  name: string;
+  id: number;
+  isAsset: boolean;
+  isSlice: boolean;
+  bounds: LanhuBounds;
+  scaleType?: number;
 }
 
-/**
- * 简化的图层数据（用于工具返回）
- */
+export interface LanhuDocument {
+  board: LanhuBoard;
+  assets?: LanhuAssetSummary[];
+}
+
+export interface SimplifiedBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  absoluteX?: number;
+  absoluteY?: number;
+}
+
+export interface SimplifiedTextStyle {
+  fontSize: number;
+  fontFamily: string;
+  fontWeight?: number;
+  fontStyle?: 'normal' | 'italic';
+  color: string;
+  alignment: string;
+  lineHeight?: number;
+  letterSpacing?: number;
+}
+
+export interface SimplifiedGradientStop {
+  position: number;
+  color: string;
+  opacity?: number;
+}
+
+export interface SimplifiedGradient {
+  type: string;
+  angle?: number;
+  stops: SimplifiedGradientStop[];
+}
+
+export interface SimplifiedFill {
+  type: 'solid' | 'gradient';
+  color?: string;
+  gradient?: SimplifiedGradient;
+}
+
+export interface SimplifiedStroke {
+  color: string;
+  width: number;
+  opacity?: number;
+  alignment?: string;
+}
+
+export interface SimplifiedShadow {
+  type: 'dropShadow' | 'innerShadow';
+  color: string;
+  opacity: number;
+  angle?: number;
+  distance: number;
+  blur: number;
+  spread: number;
+  x: number;
+  y: number;
+  blendMode?: string;
+}
+
 export interface SimplifiedLayer {
   id: number;
   name: string;
   type: string;
+  sourceType?: LanhuLayerType;
   visible: boolean;
-  bounds: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
+  clipped?: boolean;
+  isClippingMask?: boolean;
+  isAsset?: boolean;
+  zIndex?: number;
+  bounds: SimplifiedBounds;
   text?: string;
-  textStyle?: {
-    fontSize: number;
-    fontFamily: string;
-    color: string;
-    alignment: string;
-  };
+  textStyle?: SimplifiedTextStyle;
   fill?: string;
-  stroke?: {
-    color: string;
-    width: number;
-  };
+  fills?: SimplifiedFill[];
+  stroke?: SimplifiedStroke;
+  opacity?: number;
+  borderRadius?: number | number[];
+  shapeType?: string;
+  shadows?: SimplifiedShadow[];
+  assetUrl?: string;
+  assetUrls?: Record<string, string>;
   children?: SimplifiedLayer[];
 }
 
-/**
- * 文档统计信息
- */
+export interface ArtboardInfo {
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface TextLayerSummary {
+  id: number;
+  name: string;
+  text: string;
+  bounds: SimplifiedBounds;
+  style?: SimplifiedTextStyle;
+}
+
+export interface AssetSummary {
+  id: number;
+  name: string;
+  type: string;
+  bounds: SimplifiedBounds;
+  assetUrl?: string;
+  assetUrls?: Record<string, string>;
+}
+
+export interface DesignTokens {
+  colors: string[];
+  fonts: string[];
+  fontSizes: number[];
+  radii: number[];
+  shadowPresets: string[];
+}
+
+export interface BuildLayerTreeOptions {
+  includeInvisible?: boolean;
+  normalizeToArtboard?: boolean;
+}
+
 export interface DocumentStats {
   totalLayers: number;
   textLayers: number;
