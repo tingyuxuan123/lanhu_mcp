@@ -123,6 +123,90 @@ function layerAttrs(node) {
   ].filter(Boolean).join(' ');
 }
 
+const styleRegistry = new Map();
+const styleClassCounters = new Map();
+
+function normalizeStyle(style = '') {
+  return String(style)
+    .split(';')
+    .map(item => item.trim())
+    .filter(Boolean)
+    .join(';');
+}
+
+function sanitizeClassPrefix(prefix = 'node') {
+  const normalized = String(prefix)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalized || 'node';
+}
+
+function registerStyleClass(prefix, style) {
+  const normalizedStyle = normalizeStyle(style);
+  if (!normalizedStyle) {
+    return '';
+  }
+
+  const safePrefix = sanitizeClassPrefix(prefix);
+  const registryKey = `${safePrefix}::${normalizedStyle}`;
+  const existing = styleRegistry.get(registryKey);
+  if (existing) {
+    return existing.className;
+  }
+
+  const nextCount = (styleClassCounters.get(safePrefix) || 0) + 1;
+  styleClassCounters.set(safePrefix, nextCount);
+
+  const className = `${safePrefix}-${nextCount}`;
+  styleRegistry.set(registryKey, {
+    className,
+    style: normalizedStyle,
+  });
+
+  return className;
+}
+
+function joinClassNames(...values) {
+  const result = [];
+  const seen = new Set();
+
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+
+    const parts = Array.isArray(value)
+      ? value
+      : String(value).split(/\s+/);
+
+    for (const part of parts) {
+      const token = String(part || '').trim();
+      if (!token || seen.has(token)) {
+        continue;
+      }
+
+      seen.add(token);
+      result.push(token);
+    }
+  }
+
+  return result.join(' ');
+}
+
+function renderClassAttr(baseClasses, stylePrefix, style) {
+  const classes = joinClassNames(baseClasses, registerStyleClass(stylePrefix, style));
+  return classes ? `class="${classes}"` : '';
+}
+
+function renderGeneratedCss() {
+  return [...styleRegistry.values()]
+    .map(({ className, style }) => `    .${className} { ${style}${style.endsWith(';') ? '' : ';'} }`)
+    .join('\n');
+}
+
 function sortByPaint(nodes) {
   return [...nodes].sort((left, right) => (right.zIndex || 0) - (left.zIndex || 0));
 }
@@ -619,7 +703,7 @@ function simpleAssetChildrenFlowLayout(node, children) {
       marginTop > 0 ? `margin-top:${marginTop}px` : '',
     ].filter(Boolean).join(';');
 
-    return `<div style="${wrapperStyles}">${renderNode(child, 0, 0, 'flow', false)}</div>`;
+    return `<div ${renderClassAttr('asset-child-flow', 'asset-child-flow', wrapperStyles)}>${renderNode(child, 0, 0, 'flow', false)}</div>`;
   }).join('');
 
   return {
@@ -697,7 +781,8 @@ function renderTextContent(node) {
       chunks.push(escapeHtml(text.slice(cursor, range.from)));
     }
     const content = escapeHtml(text.slice(range.from, range.to));
-    chunks.push(`<span style="${stylesForRange(range)}">${content}</span>`);
+    const rangeClassAttr = renderClassAttr('text-range', 'text-range', stylesForRange(range));
+    chunks.push(`<span${rangeClassAttr ? ` ${rangeClassAttr}` : ''}>${content}</span>`);
     cursor = range.to;
   }
   if (cursor < text.length) {
@@ -713,7 +798,7 @@ function renderShapeNode(node, offsetX = 0, offsetY = 0, mode = 'absolute', clas
       shapeClipStyles(node, node.bounds),
     ].filter(Boolean).join(';');
 
-    return `<div class="layer ${className}" ${layerAttrs(node)} style="${wrapperStyle}"></div>`;
+    return `<div ${renderClassAttr(`layer ${className}`, `${className}-layer`, wrapperStyle)} ${layerAttrs(node)}></div>`;
   }
 
   const pathBounds = node.pathData.pathBounds || node.bounds;
@@ -737,7 +822,9 @@ function renderShapeNode(node, offsetX = 0, offsetY = 0, mode = 'absolute', clas
   const stroke = node.stroke?.color || 'none';
   const strokeWidth = node.stroke?.width || 0;
 
-  return `<div class="layer ${className}" ${layerAttrs(node)} style="${wrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pathBounds.width} ${pathBounds.height}" style="${svgStyle};pointer-events:none;"><path d="${svgPathForNode(node, pathBounds)}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" fill-rule="evenodd" /></svg></div>`;
+  const svgClassAttr = renderClassAttr('shape-svg', 'shape-svg', `${svgStyle};pointer-events:none`);
+
+  return `<div ${renderClassAttr(`layer ${className}`, `${className}-layer`, wrapperStyle)} ${layerAttrs(node)}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pathBounds.width} ${pathBounds.height}" ${svgClassAttr}><path d="${svgPathForNode(node, pathBounds)}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" fill-rule="evenodd" /></svg></div>`;
 }
 
 function renderAssetVectorGroup(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
@@ -770,7 +857,7 @@ function renderAssetVectorGroup(node, offsetX = 0, offsetY = 0, mode = 'absolute
     ? flowLayout.childrenHtml
     : renderLayerList(children, node.bounds.x, node.bounds.y, 'absolute', false);
 
-  return `<div class="layer asset-vector" ${layerAttrs(node)} style="${wrapperStyle}">${childrenHtml}</div>`;
+  return `<div ${renderClassAttr('layer asset-vector', 'asset-vector', wrapperStyle)} ${layerAttrs(node)}>${childrenHtml}</div>`;
 }
 
 function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
@@ -797,11 +884,11 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
   }
 
   if (node.renderStrategy === 'asset' && node.assetUrl) {
-    return `<div class="layer asset" ${layerAttrs(node)} style="${boxStyles(node, { offsetX, offsetY, mode })}"><img src="${node.assetUrl}" style="width:100%;height:100%;display:block;object-fit:fill;pointer-events:none;" /></div>`;
+    return `<div ${renderClassAttr('layer asset', 'asset-layer', boxStyles(node, { offsetX, offsetY, mode }))} ${layerAttrs(node)}><img src="${node.assetUrl}" ${renderClassAttr('asset-image', 'asset-image', 'width:100%;height:100%;display:block;object-fit:fill;pointer-events:none')} /></div>`;
   }
 
   if (node.text) {
-    return `<div class="layer text" ${layerAttrs(node)} style="${textContainerStyles(node, offsetX, offsetY, mode)}">${renderTextContent(node)}</div>`;
+    return `<div ${renderClassAttr('layer text', 'text-layer', textContainerStyles(node, offsetX, offsetY, mode))} ${layerAttrs(node)}>${renderTextContent(node)}</div>`;
   }
 
   if (node.renderStrategy === 'shape' && node.pathData?.components?.length) {
@@ -812,7 +899,7 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
     return '';
   }
 
-  return `<div class="layer ${node.type}" ${layerAttrs(node)} style="${boxStyles(node, { offsetX, offsetY, mode })}"></div>`;
+  return `<div ${renderClassAttr(`layer ${node.type}`, `${node.type}-layer`, boxStyles(node, { offsetX, offsetY, mode }))} ${layerAttrs(node)}></div>`;
 }
 
 function renderBitmapFallback(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
@@ -824,7 +911,7 @@ function renderBitmapFallback(node, offsetX = 0, offsetY = 0, mode = 'absolute')
       includeVisual: false,
     });
     const iconColor = '#8e9cb3';
-    return `<div class="layer bitmap-fallback avatar" ${layerAttrs(node)} style="${wrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style="width:100%;height:100%;display:block;pointer-events:none;"><circle cx="24" cy="17" r="8" fill="${iconColor}" /><path d="M10 39c1.8-8.2 8.1-12.3 14-12.3S36.2 30.8 38 39" fill="${iconColor}" /></svg></div>`;
+    return `<div ${renderClassAttr('layer bitmap-fallback avatar', 'avatar-fallback', wrapperStyle)} ${layerAttrs(node)}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" ${renderClassAttr('fallback-icon-svg', 'fallback-icon-svg', 'width:100%;height:100%;display:block;pointer-events:none')}><circle cx="24" cy="17" r="8" fill="${iconColor}" /><path d="M10 39c1.8-8.2 8.1-12.3 14-12.3S36.2 30.8 38 39" fill="${iconColor}" /></svg></div>`;
   }
 
   if (node.name === '我的') {
@@ -835,7 +922,7 @@ function renderBitmapFallback(node, offsetX = 0, offsetY = 0, mode = 'absolute')
       includeVisual: false,
     });
     const iconColor = '#c6c6c6';
-    return `<div class="layer bitmap-fallback profile" ${layerAttrs(node)} style="${wrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style="width:100%;height:100%;display:block;pointer-events:none;"><circle cx="24" cy="18" r="8" fill="${iconColor}" /><path d="M11 39c1.7-7.7 7.7-11.5 13-11.5S35.3 31.3 37 39" fill="${iconColor}" /></svg></div>`;
+    return `<div ${renderClassAttr('layer bitmap-fallback profile', 'profile-fallback', wrapperStyle)} ${layerAttrs(node)}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" ${renderClassAttr('fallback-icon-svg', 'fallback-icon-svg', 'width:100%;height:100%;display:block;pointer-events:none')}><circle cx="24" cy="18" r="8" fill="${iconColor}" /><path d="M11 39c1.7-7.7 7.7-11.5 13-11.5S35.3 31.3 37 39" fill="${iconColor}" /></svg></div>`;
   }
 
   if (node.name === 'Path' && node.bounds.y <= 40 && node.bounds.width >= 600) {
@@ -858,19 +945,19 @@ function renderBitmapFallback(node, offsetX = 0, offsetY = 0, mode = 'absolute')
       'box-sizing:border-box',
     ].join(';');
 
-    return `<div class="layer bitmap-fallback status-bar" ${layerAttrs(node)} style="${wrapperStyle}">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:8px;letter-spacing:-1px">●●●●●</span>
+    return `<div ${renderClassAttr('layer bitmap-fallback status-bar', 'status-bar', wrapperStyle)} ${layerAttrs(node)}>
+      <div ${renderClassAttr('status-bar-left-group', 'status-bar-left-group', 'display:flex;align-items:center;gap:6px')}>
+        <span ${renderClassAttr('status-bar-signal-dots', 'status-bar-signal-dots', 'font-size:8px;letter-spacing:-1px')}>●●●●●</span>
         <span>${escapeHtml(statusAppLabel)}</span>
       </div>
       <div>${escapeHtml(statusTimeLabel)}</div>
-      <div style="display:flex;align-items:center;gap:6px">
+      <div ${renderClassAttr('status-bar-right-group', 'status-bar-right-group', 'display:flex;align-items:center;gap:6px')}>
         <span>100%</span>
-        <span style="display:inline-flex;align-items:center;gap:2px">
-          <span style="display:inline-flex;width:24px;height:11px;border:1.5px solid #111827;border-radius:2px;box-sizing:border-box;padding:1px">
-            <span style="display:block;width:15px;height:100%;background:#111827;border-radius:1px"></span>
+        <span ${renderClassAttr('status-bar-battery', 'status-bar-battery', 'display:inline-flex;align-items:center;gap:2px')}>
+          <span ${renderClassAttr('status-bar-battery-shell', 'status-bar-battery-shell', 'display:inline-flex;width:24px;height:11px;border:1.5px solid #111827;border-radius:2px;box-sizing:border-box;padding:1px')}>
+            <span ${renderClassAttr('status-bar-battery-level', 'status-bar-battery-level', 'display:block;width:15px;height:100%;background:#111827;border-radius:1px')}></span>
           </span>
-          <span style="display:inline-block;width:2px;height:5px;background:#111827;border-radius:0 1px 1px 0"></span>
+          <span ${renderClassAttr('status-bar-battery-cap', 'status-bar-battery-cap', 'display:inline-block;width:2px;height:5px;background:#111827;border-radius:0 1px 1px 0')}></span>
         </span>
       </div>
     </div>`;
@@ -992,7 +1079,7 @@ function buildGridOverlayChild(contentClassName, margin, html) {
     styles.push(`margin:${margin.top}px 0 0 ${margin.left}px`);
   }
 
-  return `<div class="${contentClassName}" style="${styles.join(';')}">${html}</div>`;
+  return `<div ${renderClassAttr(contentClassName, contentClassName, styles.join(';'))}>${html}</div>`;
 }
 
 function canUseDetachedGridOverlay(node, visualNode, contentNode, visualOffset, contentOffset) {
@@ -1202,7 +1289,7 @@ function isBoundsInside(outerBounds, innerBounds, tolerance = 1.5) {
 
 function renderFlowWrapper(styles, html) {
   const style = styles.filter(Boolean).join(';');
-  return `<div style="${style}">${html}</div>`;
+  return `<div ${renderClassAttr('flow-wrapper', 'flow-wrapper', style)}>${html}</div>`;
 }
 
 function toggleControlFlowLayout(node, children) {
@@ -1373,7 +1460,7 @@ function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insi
             ? singleFlow.childrenHtml
             : renderLayerList(contentChildren, node.bounds.x, node.bounds.y, 'absolute', insideMask)
     : detachedFlow?.childrenHtml || '';
-  return `<div class="layer container" ${layerAttrs(node)} ${maskedFlow?.extraAttrs || ''} style="${wrapperStyle}">${childrenHtml}</div>`;
+  return `<div ${renderClassAttr('layer container', 'container-layer', wrapperStyle)} ${layerAttrs(node)} ${maskedFlow?.extraAttrs || ''}>${childrenHtml}</div>`;
 }
 
 function flexLayoutStyles(node, mode = 'absolute') {
@@ -1460,7 +1547,7 @@ function renderLayoutLines(node) {
     }
 
     const lineHtml = items.map(child => renderFlowNode(child)).join('\n');
-    return `<div class="layout-line" style="${styles.filter(Boolean).join(';')}">${lineHtml}</div>`;
+    return `<div ${renderClassAttr('layout-line', 'layout-line', styles.filter(Boolean).join(';'))}>${lineHtml}</div>`;
   }).join('\n');
 }
 
@@ -1512,7 +1599,7 @@ function renderFlexNode(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
     ? renderLayoutLines(node)
     : items.map(child => renderFlowNode(child)).join('\n');
 
-  return `<div class="layer flex-node" ${layerAttrs(node)} style="${wrapperStyle}">${overlayHtml}${flowHtml}</div>`;
+  return `<div ${renderClassAttr('layer flex-node', 'flex-node', wrapperStyle)} ${layerAttrs(node)}>${overlayHtml}${flowHtml}</div>`;
 }
 
 function renderMaskGroup(maskNode, offsetX = 0, offsetY = 0, mode = 'absolute') {
@@ -1538,7 +1625,7 @@ function renderMaskGroup(maskNode, offsetX = 0, offsetY = 0, mode = 'absolute') 
       'box-sizing:border-box',
     ].filter(Boolean).join(';');
     const childHtml = renderNode(simpleTarget, maskNode.bounds.x, maskNode.bounds.y, 'flow', true);
-    return `<div class="layer mask" ${layerAttrs(maskNode)} style="${wrapperStyles}">${childHtml}</div>`;
+    return `<div ${renderClassAttr('layer mask', 'mask-layer', wrapperStyles)} ${layerAttrs(maskNode)}>${childHtml}</div>`;
   }
 
   const ownMask = hasVisual(maskNode) ? renderOwn(maskNode, offsetX, offsetY, mode) : '';
@@ -1555,7 +1642,7 @@ function renderMaskGroup(maskNode, offsetX = 0, offsetY = 0, mode = 'absolute') 
   ].join(';');
   const childrenHtml = sortByPaint(targets).map(target => renderNode(target, maskNode.bounds.x, maskNode.bounds.y, 'absolute', true)).join('\n');
 
-  return `${ownMask}<div class="layer mask" ${layerAttrs(maskNode)} style="${wrapperStyles}">${childrenHtml}</div>`;
+  return `${ownMask}<div ${renderClassAttr('layer mask', 'mask-layer', wrapperStyles)} ${layerAttrs(maskNode)}>${childrenHtml}</div>`;
 }
 
 function renderNode(node, offsetX = 0, offsetY = 0, mode = 'absolute', insideMask = false) {
@@ -1721,7 +1808,7 @@ function renderGridPlacedNode(node, mode = 'flow') {
     Math.abs(node.bounds.x) > 0.01 ? `margin-left:${node.bounds.x}px` : '',
   ].filter(Boolean).join(';');
 
-  return `<div style="${styles}">${html}</div>`;
+  return `<div ${renderClassAttr('root-grid-node', 'root-grid-node', styles)}>${html}</div>`;
 }
 
 function renderRootFlowContent(nodes) {
@@ -1748,10 +1835,10 @@ function renderRootFlowContent(nodes) {
         Math.abs(marginLeft) > 0.01 ? `margin-left:${marginLeft}px` : '',
         Math.abs(marginTopWithinRow) > 0.01 ? `margin-top:${marginTopWithinRow}px` : '',
       ].filter(Boolean).join(';');
-      return `<div style="${wrapperStyles}">${renderFlowNode(node)}</div>`;
+      return `<div ${renderClassAttr('root-flow-item', 'root-flow-item', wrapperStyles)}>${renderFlowNode(node)}</div>`;
     }).join('');
 
-    return `<div class="root-flow-row" style="${rowStyles.filter(Boolean).join(';')}">${childrenHtml}</div>`;
+    return `<div ${renderClassAttr('root-flow-row', 'root-flow-row', rowStyles.filter(Boolean).join(';'))}>${childrenHtml}</div>`;
   }).join('\n');
 }
 
@@ -1768,10 +1855,13 @@ function renderRoot(nodes) {
   const contentHtml = renderRootFlowContent(contents);
 
   return [
-    `<div class="root-background-layer" style="grid-area:1 / 1;z-index:0;display:grid;grid-template-columns:minmax(0, 1fr);grid-template-rows:minmax(0, 1fr);width:${artboard.width}px;height:${artboard.height}px;overflow:hidden;box-sizing:border-box;">${backgroundHtml}</div>`,
-    `<div class="root-content-layer" style="grid-area:1 / 1;z-index:1;display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start;width:${artboard.width}px;height:${artboard.height}px;overflow:hidden;box-sizing:border-box;">${contentHtml}</div>`,
+    `<div ${renderClassAttr('root-background-layer', 'root-background-layer', `grid-area:1 / 1;z-index:0;display:grid;grid-template-columns:minmax(0, 1fr);grid-template-rows:minmax(0, 1fr);width:${artboard.width}px;height:${artboard.height}px;overflow:hidden;box-sizing:border-box`)}>${backgroundHtml}</div>`,
+    `<div ${renderClassAttr('root-content-layer', 'root-content-layer', `grid-area:1 / 1;z-index:1;display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start;width:${artboard.width}px;height:${artboard.height}px;overflow:hidden;box-sizing:border-box`)}>${contentHtml}</div>`,
   ].join('\n');
 }
+
+const renderedRoot = renderRoot(layers);
+const generatedCss = renderGeneratedCss();
 
 const html = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -1786,10 +1876,11 @@ const html = `<!DOCTYPE html>
     .layer { box-sizing: border-box; }
     .text { -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; user-select: text; }
     #artboard img, #artboard svg, #artboard path { pointer-events: none; }
+${generatedCss}
   </style>
 </head>
 <body>
-  <div id="artboard">${renderRoot(layers)}</div>
+  <div id="artboard">${renderedRoot}</div>
 </body>
 </html>`;
 

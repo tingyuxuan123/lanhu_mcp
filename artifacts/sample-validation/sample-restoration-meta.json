@@ -1,4 +1,10 @@
 {
+  "source": {
+    "mode": "local_sample",
+    "jsonPath": "D:\\project\\lanhu_mcp\\tmp_sample.json",
+    "imagePath": "D:\\project\\lanhu_mcp\\tmp_sample.png",
+    "referenceImagePath": "D:\\project\\lanhu_mcp\\tmp_sample.png"
+  },
   "artboard": {
     "name": "1-4货主-首页调整",
     "x": 2550,
@@ -610,16 +616,16 @@
       "height": 1547
     },
     "resizedCandidate": false,
-    "visualDiffPercent": 8.42,
-    "pixelMismatchPercent": 9.17,
-    "meanAbsoluteDiffPercent": 3.26,
-    "weightedDiffPercent": 3.98,
-    "visualSimilarityScore": 96.02,
+    "visualDiffPercent": 32.88,
+    "pixelMismatchPercent": 34.58,
+    "meanAbsoluteDiffPercent": 9.33,
+    "weightedDiffPercent": 9.97,
+    "visualSimilarityScore": 90.03,
     "mismatchBounds": {
-      "x": 13,
-      "y": 29,
-      "width": 727,
-      "height": 1487
+      "x": 0,
+      "y": 0,
+      "width": 750,
+      "height": 1531
     },
     "worstRegions": [
       {
@@ -629,8 +635,28 @@
         "y": 580,
         "width": 188,
         "height": 194,
-        "diffPercent": 27.21,
-        "weightedDiffPercent": 10.42
+        "diffPercent": 79.32,
+        "weightedDiffPercent": 19.83
+      },
+      {
+        "row": 0,
+        "col": 1,
+        "x": 187,
+        "y": 0,
+        "width": 188,
+        "height": 194,
+        "diffPercent": 79.65,
+        "weightedDiffPercent": 18.66
+      },
+      {
+        "row": 0,
+        "col": 2,
+        "x": 375,
+        "y": 0,
+        "width": 188,
+        "height": 194,
+        "diffPercent": 88,
+        "weightedDiffPercent": 18.64
       },
       {
         "row": 3,
@@ -639,47 +665,27 @@
         "y": 580,
         "width": 188,
         "height": 194,
-        "diffPercent": 18.29,
-        "weightedDiffPercent": 8.25
+        "diffPercent": 64.98,
+        "weightedDiffPercent": 18.23
       },
       {
-        "row": 5,
-        "col": 0,
-        "x": 0,
-        "y": 966,
+        "row": 3,
+        "col": 2,
+        "x": 375,
+        "y": 580,
         "width": 188,
         "height": 194,
-        "diffPercent": 14.69,
-        "weightedDiffPercent": 7.46
-      },
-      {
-        "row": 6,
-        "col": 0,
-        "x": 0,
-        "y": 1160,
-        "width": 188,
-        "height": 194,
-        "diffPercent": 16.32,
-        "weightedDiffPercent": 7.07
-      },
-      {
-        "row": 5,
-        "col": 1,
-        "x": 187,
-        "y": 966,
-        "width": 188,
-        "height": 194,
-        "diffPercent": 15.18,
-        "weightedDiffPercent": 6.82
+        "diffPercent": 76.82,
+        "weightedDiffPercent": 18.17
       }
     ],
     "suggestions": [
       "顶部区域差异明显，优先检查状态栏、导航栏、顶部背景和搜索框。",
       "底部区域差异明显，优先检查 TabBar、高亮态和底部留白。",
       "差异覆盖几乎整张图，通常是整体缩放、主背景色或容器宽高不一致。",
-      "重点修正区域：第 4 行第 2 列，加权差异约 10.42%。",
-      "重点修正区域：第 4 行第 1 列，加权差异约 8.25%。",
-      "重点修正区域：第 6 行第 1 列，加权差异约 7.46%。"
+      "重点修正区域：第 4 行第 2 列，加权差异约 19.83%。",
+      "重点修正区域：第 1 行第 2 列，加权差异约 18.66%。",
+      "重点修正区域：第 1 行第 3 列，加权差异约 18.64%。"
     ],
     "diffImagePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-diff.png"
   }
