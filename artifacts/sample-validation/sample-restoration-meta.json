@@ -604,16 +604,16 @@
       "height": 1547
     },
     "resizedCandidate": false,
-    "visualDiffPercent": 10.28,
-    "pixelMismatchPercent": 10.26,
-    "meanAbsoluteDiffPercent": 3.39,
-    "weightedDiffPercent": 4.09,
-    "visualSimilarityScore": 95.91,
+    "visualDiffPercent": 7.61,
+    "pixelMismatchPercent": 8.27,
+    "meanAbsoluteDiffPercent": 2.94,
+    "weightedDiffPercent": 3.65,
+    "visualSimilarityScore": 96.35,
     "mismatchBounds": {
       "x": 13,
       "y": 29,
-      "width": 737,
-      "height": 1502
+      "width": 727,
+      "height": 1487
     },
     "worstRegions": [
       {
@@ -623,8 +623,8 @@
         "y": 580,
         "width": 188,
         "height": 194,
-        "diffPercent": 27.68,
-        "weightedDiffPercent": 10.67
+        "diffPercent": 27.21,
+        "weightedDiffPercent": 10.42
       },
       {
         "row": 3,
@@ -633,8 +633,8 @@
         "y": 580,
         "width": 188,
         "height": 194,
-        "diffPercent": 21.16,
-        "weightedDiffPercent": 8.76
+        "diffPercent": 18.29,
+        "weightedDiffPercent": 8.25
       },
       {
         "row": 5,
@@ -643,18 +643,8 @@
         "y": 966,
         "width": 188,
         "height": 194,
-        "diffPercent": 12.79,
+        "diffPercent": 12.8,
         "weightedDiffPercent": 6.96
-      },
-      {
-        "row": 3,
-        "col": 2,
-        "x": 375,
-        "y": 580,
-        "width": 188,
-        "height": 194,
-        "diffPercent": 22.53,
-        "weightedDiffPercent": 6.77
       },
       {
         "row": 6,
@@ -665,14 +655,24 @@
         "height": 194,
         "diffPercent": 14.79,
         "weightedDiffPercent": 6.72
+      },
+      {
+        "row": 6,
+        "col": 1,
+        "x": 187,
+        "y": 1160,
+        "width": 188,
+        "height": 194,
+        "diffPercent": 14.72,
+        "weightedDiffPercent": 6.56
       }
     ],
     "suggestions": [
       "顶部区域差异明显，优先检查状态栏、导航栏、顶部背景和搜索框。",
       "底部区域差异明显，优先检查 TabBar、高亮态和底部留白。",
       "差异覆盖几乎整张图，通常是整体缩放、主背景色或容器宽高不一致。",
-      "重点修正区域：第 4 行第 2 列，加权差异约 10.67%。",
-      "重点修正区域：第 4 行第 1 列，加权差异约 8.76%。",
+      "重点修正区域：第 4 行第 2 列，加权差异约 10.42%。",
+      "重点修正区域：第 4 行第 1 列，加权差异约 8.25%。",
       "重点修正区域：第 6 行第 1 列，加权差异约 6.96%。"
     ],
     "diffImagePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-diff.png"

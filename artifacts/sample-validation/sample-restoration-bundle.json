@@ -2327,13 +2327,13 @@
                       },
                       "intersectsArtboard": true,
                       "partiallyOutsideArtboard": false,
-                      "fill": "linear-gradient(90deg, #ffc6a1 0%, #fcfdfe 100%)",
+                      "fill": "linear-gradient(0deg, #ffc6a1 0%, #fcfdfe 100%)",
                       "fills": [
                         {
                           "type": "gradient",
                           "gradient": {
                             "type": "linear",
-                            "angle": 90,
+                            "angle": 0,
                             "stops": [
                               {
                                 "position": 0,
@@ -2720,13 +2720,13 @@
                       },
                       "intersectsArtboard": true,
                       "partiallyOutsideArtboard": false,
-                      "fill": "linear-gradient(90deg, #ff5733 0%, #fba772 100%)",
+                      "fill": "linear-gradient(0deg, #ff5733 0%, #fba772 100%)",
                       "fills": [
                         {
                           "type": "gradient",
                           "gradient": {
                             "type": "linear",
-                            "angle": 90,
+                            "angle": 0,
                             "stops": [
                               {
                                 "position": 0,
@@ -5091,13 +5091,13 @@
           },
           "intersectsArtboard": true,
           "partiallyOutsideArtboard": false,
-          "fill": "linear-gradient(90deg, #f1f5f8 0%, #ffffff 100%)",
+          "fill": "linear-gradient(0deg, #f1f5f8 0%, #ffffff 100%)",
           "fills": [
             {
               "type": "gradient",
               "gradient": {
                 "type": "linear",
-                "angle": 90,
+                "angle": 0,
                 "stops": [
                   {
                     "position": 0,
@@ -13960,13 +13960,13 @@
                   },
                   "intersectsArtboard": true,
                   "partiallyOutsideArtboard": false,
-                  "fill": "linear-gradient(180deg, #dfe7fa 0%, #d5e2f5 100%)",
+                  "fill": "linear-gradient(-90deg, #dfe7fa 0%, #d5e2f5 100%)",
                   "fills": [
                     {
                       "type": "gradient",
                       "gradient": {
                         "type": "linear",
-                        "angle": 180,
+                        "angle": -90,
                         "stops": [
                           {
                             "position": 0,
@@ -13984,9 +13984,9 @@
                   ],
                   "borderRadius": [
                     24,
+                    24,
                     0,
-                    0,
-                    24
+                    0
                   ],
                   "shapeType": "roundedRect",
                   "pathSummary": {
@@ -17580,13 +17580,13 @@
                   },
                   "intersectsArtboard": true,
                   "partiallyOutsideArtboard": false,
-                  "fill": "linear-gradient(90deg, #c0dafd 0%, #4e9bf3 100%)",
+                  "fill": "linear-gradient(0deg, #c0dafd 0%, #4e9bf3 100%)",
                   "fills": [
                     {
                       "type": "gradient",
                       "gradient": {
                         "type": "linear",
-                        "angle": 90,
+                        "angle": 0,
                         "stops": [
                           {
                             "position": 0,
@@ -17603,10 +17603,10 @@
                     }
                   ],
                   "borderRadius": [
+                    0,
                     24,
                     24,
-                    24,
-                    0
+                    24
                   ],
                   "shapeType": "roundedRect",
                   "pathSummary": {
@@ -17894,9 +17894,9 @@
                   ],
                   "borderRadius": [
                     24,
+                    24,
                     0,
-                    0,
-                    24
+                    0
                   ],
                   "shapeType": "roundedRect",
                   "pathSummary": {
@@ -18548,9 +18548,9 @@
                   },
                   "borderRadius": [
                     24,
+                    24,
                     0,
-                    0,
-                    24
+                    0
                   ],
                   "shapeType": "roundedRect",
                   "pathSummary": {
@@ -19016,13 +19016,13 @@
                           },
                           "intersectsArtboard": true,
                           "partiallyOutsideArtboard": false,
-                          "fill": "linear-gradient(90deg, #4473fc 0%, #2253e4 100%)",
+                          "fill": "linear-gradient(0deg, #4473fc 0%, #2253e4 100%)",
                           "fills": [
                             {
                               "type": "gradient",
                               "gradient": {
                                 "type": "linear",
-                                "angle": 90,
+                                "angle": 0,
                                 "stops": [
                                   {
                                     "position": 0,
@@ -19213,13 +19213,13 @@
                           },
                           "intersectsArtboard": true,
                           "partiallyOutsideArtboard": false,
-                          "fill": "linear-gradient(90deg, #6088fb 0%, #0645fc 100%)",
+                          "fill": "linear-gradient(0deg, #6088fb 0%, #0645fc 100%)",
                           "fills": [
                             {
                               "type": "gradient",
                               "gradient": {
                                 "type": "linear",
-                                "angle": 90,
+                                "angle": 0,
                                 "stops": [
                                   {
                                     "position": 0,
@@ -19766,13 +19766,13 @@
                       },
                       "intersectsArtboard": true,
                       "partiallyOutsideArtboard": false,
-                      "fill": "linear-gradient(90deg, #e5f1fc 0%, #c0d8f6 100%)",
+                      "fill": "linear-gradient(0deg, #e5f1fc 0%, #c0d8f6 100%)",
                       "fills": [
                         {
                           "type": "gradient",
                           "gradient": {
                             "type": "linear",
-                            "angle": 90,
+                            "angle": 0,
                             "stops": [
                               {
                                 "position": 0,
@@ -20217,13 +20217,13 @@
                           },
                           "intersectsArtboard": true,
                           "partiallyOutsideArtboard": false,
-                          "fill": "linear-gradient(90deg, #f9972b 0%, #e96f20 100%)",
+                          "fill": "linear-gradient(0deg, #f9972b 0%, #e96f20 100%)",
                           "fills": [
                             {
                               "type": "gradient",
                               "gradient": {
                                 "type": "linear",
-                                "angle": 90,
+                                "angle": 0,
                                 "stops": [
                                   {
                                     "position": 0,
@@ -20449,13 +20449,13 @@
                               },
                               "intersectsArtboard": true,
                               "partiallyOutsideArtboard": false,
-                              "fill": "linear-gradient(90deg, #f5b13c 0%, #ff783e 100%)",
+                              "fill": "linear-gradient(0deg, #f5b13c 0%, #ff783e 100%)",
                               "fills": [
                                 {
                                   "type": "gradient",
                                   "gradient": {
                                     "type": "linear",
-                                    "angle": 90,
+                                    "angle": 0,
                                     "stops": [
                                       {
                                         "position": 0,
@@ -20473,9 +20473,9 @@
                               ],
                               "borderRadius": [
                                 0,
+                                0,
                                 6,
-                                6,
-                                0
+                                6
                               ],
                               "shapeType": "roundedRect",
                               "pathSummary": {
@@ -22583,13 +22583,13 @@
                               },
                               "intersectsArtboard": true,
                               "partiallyOutsideArtboard": false,
-                              "fill": "linear-gradient(90deg, #f5b13c 0%, #ff783e 100%)",
+                              "fill": "linear-gradient(0deg, #f5b13c 0%, #ff783e 100%)",
                               "fills": [
                                 {
                                   "type": "gradient",
                                   "gradient": {
                                     "type": "linear",
-                                    "angle": 90,
+                                    "angle": 0,
                                     "stops": [
                                       {
                                         "position": 0,
@@ -22776,13 +22776,13 @@
                               },
                               "intersectsArtboard": true,
                               "partiallyOutsideArtboard": false,
-                              "fill": "linear-gradient(90deg, #f5b13c 0%, #ff783e 100%)",
+                              "fill": "linear-gradient(0deg, #f5b13c 0%, #ff783e 100%)",
                               "fills": [
                                 {
                                   "type": "gradient",
                                   "gradient": {
                                     "type": "linear",
-                                    "angle": 90,
+                                    "angle": 0,
                                     "stops": [
                                       {
                                         "position": 0,
@@ -23018,13 +23018,13 @@
                       },
                       "intersectsArtboard": true,
                       "partiallyOutsideArtboard": false,
-                      "fill": "linear-gradient(90deg, #e5f1fc 0%, #c0d8f6 100%)",
+                      "fill": "linear-gradient(0deg, #e5f1fc 0%, #c0d8f6 100%)",
                       "fills": [
                         {
                           "type": "gradient",
                           "gradient": {
                             "type": "linear",
-                            "angle": 90,
+                            "angle": 0,
                             "stops": [
                               {
                                 "position": 0,
@@ -23469,13 +23469,13 @@
                           },
                           "intersectsArtboard": true,
                           "partiallyOutsideArtboard": false,
-                          "fill": "linear-gradient(90deg, #2394f9 0%, #0164f8 100%)",
+                          "fill": "linear-gradient(0deg, #2394f9 0%, #0164f8 100%)",
                           "fills": [
                             {
                               "type": "gradient",
                               "gradient": {
                                 "type": "linear",
-                                "angle": 90,
+                                "angle": 0,
                                 "stops": [
                                   {
                                     "position": 0,
@@ -23659,13 +23659,13 @@
                           },
                           "intersectsArtboard": true,
                           "partiallyOutsideArtboard": false,
-                          "fill": "linear-gradient(90deg, #49bdff 0%, #026df9 100%)",
+                          "fill": "linear-gradient(0deg, #49bdff 0%, #026df9 100%)",
                           "fills": [
                             {
                               "type": "gradient",
                               "gradient": {
                                 "type": "linear",
-                                "angle": 90,
+                                "angle": 0,
                                 "stops": [
                                   {
                                     "position": 0,
@@ -26087,13 +26087,13 @@
                       },
                       "intersectsArtboard": true,
                       "partiallyOutsideArtboard": false,
-                      "fill": "linear-gradient(90deg, #e5f1fc 0%, #c0d8f6 100%)",
+                      "fill": "linear-gradient(0deg, #e5f1fc 0%, #c0d8f6 100%)",
                       "fills": [
                         {
                           "type": "gradient",
                           "gradient": {
                             "type": "linear",
-                            "angle": 90,
+                            "angle": 0,
                             "stops": [
                               {
                                 "position": 0,
@@ -27186,13 +27186,13 @@
                               },
                               "intersectsArtboard": true,
                               "partiallyOutsideArtboard": false,
-                              "fill": "linear-gradient(90deg, #16c36c 0%, #00b062 100%)",
+                              "fill": "linear-gradient(0deg, #16c36c 0%, #00b062 100%)",
                               "fills": [
                                 {
                                   "type": "gradient",
                                   "gradient": {
                                     "type": "linear",
-                                    "angle": 90,
+                                    "angle": 0,
                                     "stops": [
                                       {
                                         "position": 0,
@@ -27383,13 +27383,13 @@
                               },
                               "intersectsArtboard": true,
                               "partiallyOutsideArtboard": false,
-                              "fill": "linear-gradient(90deg, #40e4a0 0%, #00b764 100%)",
+                              "fill": "linear-gradient(0deg, #40e4a0 0%, #00b764 100%)",
                               "fills": [
                                 {
                                   "type": "gradient",
                                   "gradient": {
                                     "type": "linear",
-                                    "angle": 90,
+                                    "angle": 0,
                                     "stops": [
                                       {
                                         "position": 0,
@@ -27812,13 +27812,13 @@
                       },
                       "intersectsArtboard": true,
                       "partiallyOutsideArtboard": false,
-                      "fill": "linear-gradient(90deg, #e5f1fc 0%, #c0d8f6 100%)",
+                      "fill": "linear-gradient(0deg, #e5f1fc 0%, #c0d8f6 100%)",
                       "fills": [
                         {
                           "type": "gradient",
                           "gradient": {
                             "type": "linear",
-                            "angle": 90,
+                            "angle": 0,
                             "stops": [
                               {
                                 "position": 0,
@@ -28128,13 +28128,13 @@
               },
               "intersectsArtboard": true,
               "partiallyOutsideArtboard": false,
-              "fill": "linear-gradient(90deg, #f1f5f8 0%, #ffffff 100%)",
+              "fill": "linear-gradient(0deg, #f1f5f8 0%, #ffffff 100%)",
               "fills": [
                 {
                   "type": "gradient",
                   "gradient": {
                     "type": "linear",
-                    "angle": 90,
+                    "angle": 0,
                     "stops": [
                       {
                         "position": 0,
@@ -28152,9 +28152,9 @@
               ],
               "borderRadius": [
                 24,
+                24,
                 0,
-                0,
-                24
+                0
               ],
               "shapeType": "roundedRect",
               "pathSummary": {
@@ -30703,13 +30703,13 @@
                   },
                   "intersectsArtboard": true,
                   "partiallyOutsideArtboard": false,
-                  "fill": "linear-gradient(90deg, #ebf8fd 80%, #c5e3fe 100%)",
+                  "fill": "linear-gradient(0deg, #ebf8fd 80%, #c5e3fe 100%)",
                   "fills": [
                     {
                       "type": "gradient",
                       "gradient": {
                         "type": "linear",
-                        "angle": 90,
+                        "angle": 0,
                         "stops": [
                           {
                             "position": 0.800048828125,
@@ -32674,13 +32674,13 @@
               },
               "intersectsArtboard": true,
               "partiallyOutsideArtboard": true,
-              "fill": "linear-gradient(90deg, #ebf8fd 80%, #c5e3fe 100%)",
+              "fill": "linear-gradient(0deg, #ebf8fd 80%, #c5e3fe 100%)",
               "fills": [
                 {
                   "type": "gradient",
                   "gradient": {
                     "type": "linear",
-                    "angle": 90,
+                    "angle": 0,
                     "stops": [
                       {
                         "position": 0.800048828125,

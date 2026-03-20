@@ -104,3 +104,25 @@ test('parser drops abnormal single-line leading values', async () => {
   assert.equal(searchPlaceholder.textStyle.lineHeight, undefined);
   assert.equal(menuLabel?.textStyle?.lineHeight, undefined);
 });
+
+test('parser normalizes sample gradient angles and border radii for restoration', async () => {
+  const { layers } = await loadSampleLayers();
+  const all = flatten(layers);
+  const quickMenuBackground = all.find(node => node.id === 30067);
+  const recommendationHeader = all.find(node => node.id === 30380);
+  const primaryCardBackground = all.find(node => node.id === 30225);
+
+  assert.equal(
+    quickMenuBackground?.fill,
+    'linear-gradient(0deg, #f1f5f8 0%, #ffffff 100%)',
+  );
+  assert.deepEqual(quickMenuBackground?.borderRadius, [24, 24, 0, 0]);
+
+  assert.equal(
+    recommendationHeader?.fill,
+    'linear-gradient(-90deg, #dfe7fa 0%, #d5e2f5 100%)',
+  );
+  assert.deepEqual(recommendationHeader?.borderRadius, [24, 24, 0, 0]);
+
+  assert.deepEqual(primaryCardBackground?.borderRadius, [0, 24, 24, 24]);
+});

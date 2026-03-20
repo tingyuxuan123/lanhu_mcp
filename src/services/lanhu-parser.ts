@@ -1143,7 +1143,7 @@ export class LanhuParser {
 
     return {
       type: gradientSource?.type || source?.type || fill.type || fill.gradient?.gradientForm || source?.gradientForm || fill.class || 'linear',
-      angle: (typeof source?.angle === 'number' ? source.angle : fill.angle?.value) || undefined,
+      angle: this.normalizeGradientAngle(typeof source?.angle === 'number' ? source.angle : fill.angle?.value),
       stops: stops.map((stop, index) => ({
         position: typeof stop.location === 'number' ? stop.location / 4096 : index / Math.max(stops.length - 1, 1),
         color: stop.color ? this.colorToHex(stop.color) : '#000000',
@@ -1160,6 +1160,19 @@ export class LanhuParser {
       .join(', ');
 
     return `${prefix}(${angle}${stops})`;
+  }
+
+  private normalizeGradientAngle(angle?: number): number | undefined {
+    if (typeof angle !== 'number' || !Number.isFinite(angle)) {
+      return undefined;
+    }
+
+    const normalized = 90 - angle;
+    if (normalized === 0) {
+      return 0;
+    }
+
+    return Number(normalized.toFixed(2));
   }
 
   private getStroke(layer: LanhuLayer): SimplifiedLayer['stroke'] | undefined {
@@ -1202,14 +1215,27 @@ export class LanhuParser {
       return {};
     }
 
+    const radii = origin.radii && origin.radii.length > 0
+      ? this.normalizeBorderRadii(origin.radii)
+      : undefined;
+
     return {
       shapeType: origin.type,
-      borderRadius: origin.radii && origin.radii.length > 0
-        ? origin.radii.length === 1 || origin.radii.every(radius => radius === origin.radii?.[0])
-          ? origin.radii[0]
-          : origin.radii
+      borderRadius: radii
+        ? radii.length === 1 || radii.every(radius => radius === radii[0])
+          ? radii[0]
+          : radii
         : undefined,
     };
+  }
+
+  private normalizeBorderRadii(radii: number[]): number[] {
+    if (radii.length < 4) {
+      return [...radii];
+    }
+
+    // Lanhu/Sketch radii order is TR, BR, BL, TL; convert to CSS TL, TR, BR, BL.
+    return [radii[3], radii[0], radii[1], radii[2]];
   }
 
   private getShadows(layer: LanhuLayer): SimplifiedShadow[] | undefined {

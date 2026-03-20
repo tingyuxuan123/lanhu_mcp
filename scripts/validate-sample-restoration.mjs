@@ -304,15 +304,15 @@ function nearlyEqual(left, right) {
   return Math.abs(left - right) < 0.01;
 }
 
-function svgPathForNode(node) {
+function svgPathForNode(node, baseBounds) {
   const pathData = node.pathData;
   if (!pathData?.components?.length) {
     return '';
   }
 
-  const pathBounds = pathData.pathBounds || node.bounds;
-  const offsetX = pathBounds.x;
-  const offsetY = pathBounds.y;
+  const relativeBounds = baseBounds || pathData.pathBounds || node.bounds;
+  const offsetX = relativeBounds.x;
+  const offsetY = relativeBounds.y;
   const paths = [];
 
   for (const component of pathData.components) {
@@ -352,6 +352,18 @@ function svgPathForNode(node) {
   }
 
   return paths.join(' ');
+}
+
+function shapeClipStyles(node, baseBounds) {
+  const pathValue = svgPathForNode(node, baseBounds);
+  if (!pathValue) {
+    return '';
+  }
+
+  return [
+    `clip-path:path('${pathValue}')`,
+    `-webkit-clip-path:path('${pathValue}')`,
+  ].join(';');
 }
 
 function renderTextContent(node) {
@@ -396,7 +408,10 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
 
   if (node.renderStrategy === 'shape' && node.pathData?.components?.length) {
     const pathBounds = node.pathData.pathBounds || node.bounds;
-    const wrapperStyle = boxStyles(node, { offsetX, offsetY, mode });
+    const wrapperStyle = [
+      boxStyles(node, { offsetX, offsetY, mode }),
+      shapeClipStyles(node, node.bounds),
+    ].filter(Boolean).join(';');
     const svgStyle = [
       'position:absolute',
       `left:${pathBounds.x - node.bounds.x}px`,
@@ -503,13 +518,16 @@ function getContainerChildren(node) {
 
 function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insideMask = false) {
   const { children, visualNode } = getContainerChildren(node);
-  const wrapperStyle = boxStyles(node, {
-    offsetX,
-    offsetY,
-    mode,
-    forceClip: false,
-    visualNode: visualNode || node,
-  });
+  const wrapperStyle = [
+    boxStyles(node, {
+      offsetX,
+      offsetY,
+      mode,
+      forceClip: false,
+      visualNode: visualNode || node,
+    }),
+    visualNode ? shapeClipStyles(visualNode, node.bounds) : '',
+  ].filter(Boolean).join(';');
   const childrenHtml = children.length > 0 && node.shouldRenderChildren !== false
     ? renderLayerList(children, node.bounds.x, node.bounds.y, 'absolute', insideMask)
     : '';
@@ -569,6 +587,7 @@ function renderFlexNode(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
       forceClip: false,
       visualNode: visualNode || node,
     }),
+    visualNode ? shapeClipStyles(visualNode, node.bounds) : '',
     flexLayoutStyles(node),
   ].join(';');
   const overlayHtml = overlays
@@ -592,6 +611,7 @@ function renderMaskGroup(maskNode, offsetX = 0, offsetY = 0, mode = 'absolute') 
       mode,
       forceClip: true,
     }),
+    shapeClipStyles(maskNode, maskNode.bounds),
     'background:transparent',
   ].join(';');
   const childrenHtml = sortByPaint(targets).map(target => renderNode(target, maskNode.bounds.x, maskNode.bounds.y, 'absolute', true)).join('\n');
