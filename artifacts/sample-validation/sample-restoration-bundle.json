@@ -595,6 +595,160 @@
       "textAutoSizeIds 标记了建议使用内容自适应宽高的节点，文本容器不应强制写死 width/height。"
     ]
   },
+  "localizedAssets": {
+    "directory": "sample-restoration-assets",
+    "outputDir": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets",
+    "publicPathPrefix": "./sample-restoration-assets",
+    "localizedAssetCount": 32,
+    "downloadedFileCount": 16,
+    "files": [
+      {
+        "fileName": "icon-oc-1cb8f09b81a4.png",
+        "localPath": "./sample-restoration-assets/icon-oc-1cb8f09b81a4.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-oc-1cb8f09b81a4.png",
+        "contentHash": "1cb8f09b81a4139e0232b7888807ba47e8e05563",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_bbd0d4d514ce8440b942931b9453bbc9",
+        "size": 2710
+      },
+      {
+        "fileName": "icon-send-4c05acaf55d9.png",
+        "localPath": "./sample-restoration-assets/icon-send-4c05acaf55d9.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-send-4c05acaf55d9.png",
+        "contentHash": "4c05acaf55d9c437fd2cdb57ebc7613d51c388e4",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_19e11281628e57678966e617a4266d14",
+        "size": 7377
+      },
+      {
+        "fileName": "icon-car-48c9bc43c7e8.png",
+        "localPath": "./sample-restoration-assets/icon-car-48c9bc43c7e8.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-car-48c9bc43c7e8.png",
+        "contentHash": "48c9bc43c7e890b162f52d688aa7c176e9095f5c",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_1d1ccd237418641ed3ce46a5cf6366b5",
+        "size": 3084
+      },
+      {
+        "fileName": "icon-f2dc985b0817.png",
+        "localPath": "./sample-restoration-assets/icon-f2dc985b0817.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-f2dc985b0817.png",
+        "contentHash": "f2dc985b0817ea546dd79308512f2ece5f8053bf",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_6d0452dce8c2575d2913fd011a15aa37",
+        "size": 4404
+      },
+      {
+        "fileName": "icon-go-7b2372c1c3ae.png",
+        "localPath": "./sample-restoration-assets/icon-go-7b2372c1c3ae.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-go-7b2372c1c3ae.png",
+        "contentHash": "7b2372c1c3ae38f3547cd2e40b0faf65f0b7ef34",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_500b401f81782dd2975ff74bb48b205d",
+        "size": 2182
+      },
+      {
+        "fileName": "icon-go-bb9fb5400162.png",
+        "localPath": "./sample-restoration-assets/icon-go-bb9fb5400162.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-go-bb9fb5400162.png",
+        "contentHash": "bb9fb5400162401016a3192e10338c0cf8292875",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_9a694493d009f63afb93230f21d3084a",
+        "size": 2182
+      },
+      {
+        "fileName": "right-d10caeb79492.png",
+        "localPath": "./sample-restoration-assets/right-d10caeb79492.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\right-d10caeb79492.png",
+        "contentHash": "d10caeb794927f7fdb341dcdec0e92b5d339f1b4",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_d497fc7401513d9e1905a4c90b6c279e",
+        "size": 2404
+      },
+      {
+        "fileName": "icon-a07a6e2678db.png",
+        "localPath": "./sample-restoration-assets/icon-a07a6e2678db.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-a07a6e2678db.png",
+        "contentHash": "a07a6e2678db9b274058f69652b3e8b03818ea7a",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_3072799a36a686a51d0aa48e1055701b",
+        "size": 6116
+      },
+      {
+        "fileName": "icon-go-4739a57e88ce.png",
+        "localPath": "./sample-restoration-assets/icon-go-4739a57e88ce.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-go-4739a57e88ce.png",
+        "contentHash": "4739a57e88ced55ae143dbbc153143fde00ddcf4",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_55a855ddc0abf07d10531f7f2d49b162",
+        "size": 2183
+      },
+      {
+        "fileName": "icon-more-94ee01a67f77.png",
+        "localPath": "./sample-restoration-assets/icon-more-94ee01a67f77.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-more-94ee01a67f77.png",
+        "contentHash": "94ee01a67f77f04188e0c6feac9a4919c48c9575",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_fbd8e79dff9776134d5b455466c77655",
+        "size": 2207
+      },
+      {
+        "fileName": "icon-waybill-a6eb2cb9543b.png",
+        "localPath": "./sample-restoration-assets/icon-waybill-a6eb2cb9543b.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-waybill-a6eb2cb9543b.png",
+        "contentHash": "a6eb2cb9543b15f5daf7ed127d7aec357a0d12ff",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_c80284cd336d6363606bfc06a391d05f",
+        "size": 8322
+      },
+      {
+        "fileName": "icon-findg-433b7cf16015.png",
+        "localPath": "./sample-restoration-assets/icon-findg-433b7cf16015.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-findg-433b7cf16015.png",
+        "contentHash": "433b7cf160156b428862110ff2443851cb34390f",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_2d7c58347e1857f8404ae28f2c3e7f05",
+        "size": 4510
+      },
+      {
+        "fileName": "icon-92cbffb143c3.png",
+        "localPath": "./sample-restoration-assets/icon-92cbffb143c3.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-92cbffb143c3.png",
+        "contentHash": "92cbffb143c36beaf6d6d4b6666af6574f18c45a",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_5a816100438c7fb5599d268d47e6d61e",
+        "size": 4951
+      },
+      {
+        "fileName": "icon-abc77effd038.png",
+        "localPath": "./sample-restoration-assets/icon-abc77effd038.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-abc77effd038.png",
+        "contentHash": "abc77effd0389839e65c5c2330999ac21d31a1df",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_b249d46f79d70d590e01fefb59c77279",
+        "size": 3557
+      },
+      {
+        "fileName": "icon-614f07f32da0.png",
+        "localPath": "./sample-restoration-assets/icon-614f07f32da0.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-614f07f32da0.png",
+        "contentHash": "614f07f32da0d78f5501fce67dae88bcf33df5d8",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_e837813e303201baea8928a7cd3cc5cc",
+        "size": 4333
+      },
+      {
+        "fileName": "top-d4cc34cf2f7c.png",
+        "localPath": "./sample-restoration-assets/top-d4cc34cf2f7c.png",
+        "filePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\top-d4cc34cf2f7c.png",
+        "contentHash": "d4cc34cf2f7c46810fee1127ebe5aeffad612361",
+        "contentType": "image/png",
+        "sourceUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_db07ea22d81d98a8d444a4cb981cb41a",
+        "size": 454986
+      }
+    ],
+    "failures": []
+  },
   "layers": [
     {
       "id": 24610,
@@ -1979,7 +2133,7 @@
                       }
                     ]
                   },
-                  "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_bbd0d4d514ce8440b942931b9453bbc9",
+                  "assetUrl": "./sample-restoration-assets/icon-oc-1cb8f09b81a4.png",
                   "assetUrls": {
                     "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_bbd0d4d514ce8440b942931b9453bbc9"
                   },
@@ -1989,7 +2143,10 @@
                   "sizeHint": {
                     "width": "fixed",
                     "height": "fixed"
-                  }
+                  },
+                  "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_bbd0d4d514ce8440b942931b9453bbc9",
+                  "localAssetPath": "./sample-restoration-assets/icon-oc-1cb8f09b81a4.png",
+                  "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-oc-1cb8f09b81a4.png"
                 },
                 {
                   "id": 24601,
@@ -2717,7 +2874,7 @@
                           }
                         ]
                       },
-                      "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_19e11281628e57678966e617a4266d14",
+                      "assetUrl": "./sample-restoration-assets/icon-send-4c05acaf55d9.png",
                       "assetUrls": {
                         "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_19e11281628e57678966e617a4266d14"
                       },
@@ -2727,7 +2884,10 @@
                       "sizeHint": {
                         "width": "fixed",
                         "height": "fixed"
-                      }
+                      },
+                      "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_19e11281628e57678966e617a4266d14",
+                      "localAssetPath": "./sample-restoration-assets/icon-send-4c05acaf55d9.png",
+                      "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-send-4c05acaf55d9.png"
                     },
                     {
                       "id": 24593,
@@ -3092,7 +3252,7 @@
                   "intersectsArtboard": true,
                   "partiallyOutsideArtboard": false,
                   "blendMode": "passThrough",
-                  "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_1d1ccd237418641ed3ce46a5cf6366b5",
+                  "assetUrl": "./sample-restoration-assets/icon-car-48c9bc43c7e8.png",
                   "assetUrls": {
                     "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_1d1ccd237418641ed3ce46a5cf6366b5"
                   },
@@ -4337,7 +4497,10 @@
                   "sizeHint": {
                     "width": "fixed",
                     "height": "fixed"
-                  }
+                  },
+                  "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_1d1ccd237418641ed3ce46a5cf6366b5",
+                  "localAssetPath": "./sample-restoration-assets/icon-car-48c9bc43c7e8.png",
+                  "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-car-48c9bc43c7e8.png"
                 },
                 {
                   "id": 24573,
@@ -4607,7 +4770,7 @@
                     }
                   ],
                   "opacity": 1,
-                  "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_6d0452dce8c2575d2913fd011a15aa37",
+                  "assetUrl": "./sample-restoration-assets/icon-f2dc985b0817.png",
                   "assetUrls": {
                     "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_6d0452dce8c2575d2913fd011a15aa37"
                   },
@@ -4617,7 +4780,10 @@
                   "sizeHint": {
                     "width": "fixed",
                     "height": "fixed"
-                  }
+                  },
+                  "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_6d0452dce8c2575d2913fd011a15aa37",
+                  "localAssetPath": "./sample-restoration-assets/icon-f2dc985b0817.png",
+                  "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-f2dc985b0817.png"
                 },
                 {
                   "id": 24563,
@@ -9193,7 +9359,7 @@
                               }
                             ]
                           },
-                          "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_500b401f81782dd2975ff74bb48b205d",
+                          "assetUrl": "./sample-restoration-assets/icon-go-7b2372c1c3ae.png",
                           "assetUrls": {
                             "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_500b401f81782dd2975ff74bb48b205d"
                           },
@@ -9203,7 +9369,10 @@
                           "sizeHint": {
                             "width": "fixed",
                             "height": "fixed"
-                          }
+                          },
+                          "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_500b401f81782dd2975ff74bb48b205d",
+                          "localAssetPath": "./sample-restoration-assets/icon-go-7b2372c1c3ae.png",
+                          "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-go-7b2372c1c3ae.png"
                         }
                       ],
                       "isTextOnlyContainer": false,
@@ -13400,7 +13569,7 @@
                               }
                             ]
                           },
-                          "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_9a694493d009f63afb93230f21d3084a",
+                          "assetUrl": "./sample-restoration-assets/icon-go-bb9fb5400162.png",
                           "assetUrls": {
                             "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_9a694493d009f63afb93230f21d3084a"
                           },
@@ -13410,7 +13579,10 @@
                           "sizeHint": {
                             "width": "fixed",
                             "height": "fixed"
-                          }
+                          },
+                          "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_9a694493d009f63afb93230f21d3084a",
+                          "localAssetPath": "./sample-restoration-assets/icon-go-bb9fb5400162.png",
+                          "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-go-bb9fb5400162.png"
                         }
                       ],
                       "isTextOnlyContainer": false,
@@ -13973,7 +14145,7 @@
                     }
                   ],
                   "opacity": 1,
-                  "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_d497fc7401513d9e1905a4c90b6c279e",
+                  "assetUrl": "./sample-restoration-assets/right-d10caeb79492.png",
                   "assetUrls": {
                     "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_d497fc7401513d9e1905a4c90b6c279e"
                   },
@@ -13983,7 +14155,10 @@
                   "sizeHint": {
                     "width": "fixed",
                     "height": "fixed"
-                  }
+                  },
+                  "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_d497fc7401513d9e1905a4c90b6c279e",
+                  "localAssetPath": "./sample-restoration-assets/right-d10caeb79492.png",
+                  "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\right-d10caeb79492.png"
                 },
                 {
                   "id": 30415,
@@ -14234,7 +14409,7 @@
               },
               "intersectsArtboard": true,
               "partiallyOutsideArtboard": false,
-              "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_3072799a36a686a51d0aa48e1055701b",
+              "assetUrl": "./sample-restoration-assets/icon-a07a6e2678db.png",
               "assetUrls": {
                 "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_3072799a36a686a51d0aa48e1055701b"
               },
@@ -14244,7 +14419,10 @@
               "sizeHint": {
                 "width": "fixed",
                 "height": "fixed"
-              }
+              },
+              "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_3072799a36a686a51d0aa48e1055701b",
+              "localAssetPath": "./sample-restoration-assets/icon-a07a6e2678db.png",
+              "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-a07a6e2678db.png"
             },
             {
               "id": 30382,
@@ -17025,7 +17203,7 @@
                               }
                             ]
                           },
-                          "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_55a855ddc0abf07d10531f7f2d49b162",
+                          "assetUrl": "./sample-restoration-assets/icon-go-4739a57e88ce.png",
                           "assetUrls": {
                             "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_55a855ddc0abf07d10531f7f2d49b162"
                           },
@@ -17035,7 +17213,10 @@
                           "sizeHint": {
                             "width": "fixed",
                             "height": "fixed"
-                          }
+                          },
+                          "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_55a855ddc0abf07d10531f7f2d49b162",
+                          "localAssetPath": "./sample-restoration-assets/icon-go-4739a57e88ce.png",
+                          "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-go-4739a57e88ce.png"
                         }
                       ],
                       "isTextOnlyContainer": false,
@@ -18763,7 +18944,7 @@
                       }
                     ]
                   },
-                  "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_fbd8e79dff9776134d5b455466c77655",
+                  "assetUrl": "./sample-restoration-assets/icon-more-94ee01a67f77.png",
                   "assetUrls": {
                     "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_fbd8e79dff9776134d5b455466c77655"
                   },
@@ -18773,7 +18954,10 @@
                   "sizeHint": {
                     "width": "fixed",
                     "height": "fixed"
-                  }
+                  },
+                  "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_fbd8e79dff9776134d5b455466c77655",
+                  "localAssetPath": "./sample-restoration-assets/icon-more-94ee01a67f77.png",
+                  "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-more-94ee01a67f77.png"
                 },
                 {
                   "id": 30221,
@@ -19346,7 +19530,7 @@
                       "intersectsArtboard": true,
                       "partiallyOutsideArtboard": false,
                       "blendMode": "passThrough",
-                      "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_c80284cd336d6363606bfc06a391d05f",
+                      "assetUrl": "./sample-restoration-assets/icon-waybill-a6eb2cb9543b.png",
                       "assetUrls": {
                         "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_c80284cd336d6363606bfc06a391d05f"
                       },
@@ -20093,7 +20277,10 @@
                       "sizeHint": {
                         "width": "fixed",
                         "height": "fixed"
-                      }
+                      },
+                      "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_c80284cd336d6363606bfc06a391d05f",
+                      "localAssetPath": "./sample-restoration-assets/icon-waybill-a6eb2cb9543b.png",
+                      "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-waybill-a6eb2cb9543b.png"
                     },
                     {
                       "id": 30137,
@@ -20545,7 +20732,7 @@
                       "intersectsArtboard": true,
                       "partiallyOutsideArtboard": false,
                       "blendMode": "passThrough",
-                      "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_2d7c58347e1857f8404ae28f2c3e7f05",
+                      "assetUrl": "./sample-restoration-assets/icon-findg-433b7cf16015.png",
                       "assetUrls": {
                         "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_2d7c58347e1857f8404ae28f2c3e7f05"
                       },
@@ -23343,7 +23530,10 @@
                       "sizeHint": {
                         "width": "fixed",
                         "height": "fixed"
-                      }
+                      },
+                      "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_2d7c58347e1857f8404ae28f2c3e7f05",
+                      "localAssetPath": "./sample-restoration-assets/icon-findg-433b7cf16015.png",
+                      "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-findg-433b7cf16015.png"
                     },
                     {
                       "id": 30127,
@@ -23795,7 +23985,7 @@
                       "intersectsArtboard": true,
                       "partiallyOutsideArtboard": false,
                       "blendMode": "passThrough",
-                      "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_5a816100438c7fb5599d268d47e6d61e",
+                      "assetUrl": "./sample-restoration-assets/icon-92cbffb143c3.png",
                       "assetUrls": {
                         "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_5a816100438c7fb5599d268d47e6d61e"
                       },
@@ -26381,7 +26571,10 @@
                       "sizeHint": {
                         "width": "fixed",
                         "height": "fixed"
-                      }
+                      },
+                      "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_5a816100438c7fb5599d268d47e6d61e",
+                      "localAssetPath": "./sample-restoration-assets/icon-92cbffb143c3.png",
+                      "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-92cbffb143c3.png"
                     },
                     {
                       "id": 30084,
@@ -26833,7 +27026,7 @@
                       "intersectsArtboard": true,
                       "partiallyOutsideArtboard": false,
                       "blendMode": "passThrough",
-                      "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_b249d46f79d70d590e01fefb59c77279",
+                      "assetUrl": "./sample-restoration-assets/icon-abc77effd038.png",
                       "assetUrls": {
                         "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_b249d46f79d70d590e01fefb59c77279"
                       },
@@ -28168,7 +28361,10 @@
                       "sizeHint": {
                         "width": "fixed",
                         "height": "fixed"
-                      }
+                      },
+                      "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_b249d46f79d70d590e01fefb59c77279",
+                      "localAssetPath": "./sample-restoration-assets/icon-abc77effd038.png",
+                      "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-abc77effd038.png"
                     },
                     {
                       "id": 30070,
@@ -28856,7 +29052,7 @@
                     }
                   ],
                   "opacity": 1,
-                  "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_e837813e303201baea8928a7cd3cc5cc",
+                  "assetUrl": "./sample-restoration-assets/icon-614f07f32da0.png",
                   "assetUrls": {
                     "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_e837813e303201baea8928a7cd3cc5cc"
                   },
@@ -28866,7 +29062,10 @@
                   "sizeHint": {
                     "width": "fixed",
                     "height": "fixed"
-                  }
+                  },
+                  "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_e837813e303201baea8928a7cd3cc5cc",
+                  "localAssetPath": "./sample-restoration-assets/icon-614f07f32da0.png",
+                  "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\icon-614f07f32da0.png"
                 },
                 {
                   "id": 24225,
@@ -30986,7 +31185,7 @@
                   },
                   "intersectsArtboard": true,
                   "partiallyOutsideArtboard": false,
-                  "assetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_db07ea22d81d98a8d444a4cb981cb41a",
+                  "assetUrl": "./sample-restoration-assets/top-d4cc34cf2f7c.png",
                   "assetUrls": {
                     "png_xxxhd": "https://lanhu-oss-proxy.lanhuapp.com/max_db07ea22d81d98a8d444a4cb981cb41a"
                   },
@@ -30996,7 +31195,10 @@
                   "sizeHint": {
                     "width": "fixed",
                     "height": "fixed"
-                  }
+                  },
+                  "remoteAssetUrl": "https://lanhu-oss-proxy.lanhuapp.com/max_db07ea22d81d98a8d444a4cb981cb41a",
+                  "localAssetPath": "./sample-restoration-assets/top-d4cc34cf2f7c.png",
+                  "localAssetFilePath": "D:\\project\\lanhu_mcp\\artifacts\\sample-validation\\sample-restoration-assets\\top-d4cc34cf2f7c.png"
                 },
                 {
                   "id": 24177,

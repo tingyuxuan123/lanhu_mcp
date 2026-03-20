@@ -27,6 +27,7 @@ export class StyleExtractor {
     const isContentWidth = node.sizeHint?.width === 'content';
     const isContentHeight = node.sizeHint?.height === 'content';
     const isFlex = node.layoutHint && node.layoutHint.mode !== 'absolute';
+    const assetReference = this.getAssetReference(node);
 
     lines.push(`/* ${node.name} (${node.type}) */`);
     lines.push(`.${className} {`);
@@ -63,8 +64,8 @@ export class StyleExtractor {
       lines.push(`  opacity: ${node.opacity};`);
     }
 
-    if (node.assetUrl) {
-      lines.push(`  background-image: url('${node.assetUrl}');`);
+    if (assetReference) {
+      lines.push(`  background-image: url('${assetReference}');`);
       lines.push('  background-repeat: no-repeat;');
       lines.push('  background-position: center;');
       lines.push('  background-size: contain;');
@@ -174,6 +175,7 @@ export class StyleExtractor {
     const style: Record<string, string | number> = {
       boxSizing: 'border-box',
     };
+    const assetReference = this.getAssetReference(node);
 
     if (node.layoutHint && node.layoutHint.mode !== 'absolute') {
       style.display = 'flex';
@@ -193,8 +195,8 @@ export class StyleExtractor {
     if (node.sizeHint?.height !== 'content') style.height = `${node.bounds.height}px`;
 
     if (node.opacity !== undefined) style.opacity = node.opacity;
-    if (node.assetUrl) {
-      style.backgroundImage = `url(${node.assetUrl})`;
+    if (assetReference) {
+      style.backgroundImage = `url(${assetReference})`;
       style.backgroundRepeat = 'no-repeat';
       style.backgroundPosition = 'center';
       style.backgroundSize = 'contain';
@@ -243,6 +245,10 @@ export class StyleExtractor {
     if (value === 'start') return 'flex-start';
     if (value === 'end') return 'flex-end';
     return value;
+  }
+
+  private getAssetReference(node: SimplifiedLayer): string | undefined {
+    return node.localAssetPath || node.assetUrl;
   }
 
   extractBatchFromLanhu(layers: SimplifiedLayer[], format: OutputFormat = 'css'): string {

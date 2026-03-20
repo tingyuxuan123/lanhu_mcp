@@ -142,12 +142,19 @@ export class LanhuClient {
   }
 
   async fetchBinary(url: string): Promise<Buffer> {
+    const result = await this.fetchBinaryWithMetadata(url);
+    return result.buffer;
+  }
+
+  async fetchBinaryWithMetadata(url: string): Promise<{ buffer: Buffer; contentType?: string }> {
     try {
       const response = await fetch(url, {
         method: 'GET',
         headers: {
+          ...(this.cookie ? { Cookie: this.cookie } : {}),
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           Accept: '*/*',
+          Referer: 'https://lanhuapp.com/web/',
         },
         signal: AbortSignal.timeout(this.timeout),
       });
@@ -156,7 +163,10 @@ export class LanhuClient {
         throw new ApiError(`Binary request failed: ${response.status} ${response.statusText}`, response.status);
       }
 
-      return Buffer.from(await response.arrayBuffer());
+      return {
+        buffer: Buffer.from(await response.arrayBuffer()),
+        contentType: response.headers.get('content-type') || undefined,
+      };
     } catch (error) {
       if (error instanceof ApiError) {
         throw error;

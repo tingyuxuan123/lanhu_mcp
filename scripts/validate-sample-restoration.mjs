@@ -1,9 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { AssetLocalizer } from '../dist/services/asset-localizer.js';
 import { LanhuClient } from '../dist/services/lanhu-client.js';
 import { LanhuParser } from '../dist/services/lanhu-parser.js';
 import { imageCompareService } from '../dist/services/image-compare.js';
+import { buildAssetPublicPath } from '../dist/utils/asset-localization.js';
 import { parseLanhuUrl } from '../dist/utils/url-parser.js';
 
 const pageUrl = process.env.LANHU_PAGE_URL;
@@ -18,6 +20,8 @@ const outputDir = path.resolve(
   || (pageUrl || directJsonUrl ? 'artifacts/lanhu-restoration' : 'artifacts/sample-validation'),
 );
 const outputPrefix = process.env.RESTORATION_OUTPUT_PREFIX || (pageUrl || directJsonUrl ? 'lanhu-restoration' : 'sample-restoration');
+const localAssetDirName = `${outputPrefix}-assets`;
+const localAssetDir = path.join(outputDir, localAssetDirName);
 const statusTimeLabel = process.env.SAMPLE_STATUS_TIME || '1:21 AM';
 const statusAppLabel = process.env.SAMPLE_STATUS_APP || 'WeChat';
 
@@ -30,12 +34,12 @@ if (pageUrl && !cookie) {
 let document;
 let sourceMeta;
 let referenceImageUrl = directReferenceImageUrl;
+let lanhuClient = cookie ? new LanhuClient(cookie) : null;
 
 if (pageUrl) {
-  const client = new LanhuClient(cookie);
-  const imageInfo = await client.getImageInfo(parseLanhuUrl(pageUrl));
-  const latestVersion = client.getLatestVersion(imageInfo);
-  document = await client.fetchSketchJson(latestVersion.json_url);
+  const imageInfo = await lanhuClient.getImageInfo(parseLanhuUrl(pageUrl));
+  const latestVersion = lanhuClient.getLatestVersion(imageInfo);
+  document = await lanhuClient.fetchSketchJson(latestVersion.json_url);
   referenceImageUrl = referenceImageUrl || imageInfo.url || latestVersion.url;
   sourceMeta = {
     mode: 'page_url',
@@ -84,6 +88,10 @@ const layers = parser.buildLayerTree(parsed, 30, {
   includeInvisible: false,
   normalizeToArtboard: true,
 });
+const assets = parser.extractAssets(parsed, {
+  includeInvisible: false,
+  normalizeToArtboard: true,
+});
 const restoration = parser.buildRestorationPlan(layers);
 
 const htmlPath = path.join(outputDir, `${outputPrefix}.html`);
@@ -102,6 +110,8 @@ const walk = nodes => {
   }
 };
 walk(layers);
+
+const localizedAssets = await localizeAssetUrls(layers, assets);
 
 const maskedTargetIds = new Set(restoration.maskGroups.flatMap(group => group.targetIds));
 
@@ -205,6 +215,18 @@ function renderGeneratedCss() {
   return [...styleRegistry.values()]
     .map(({ className, style }) => `    .${className} { ${style}${style.endsWith(';') ? '' : ';'} }`)
     .join('\n');
+}
+
+async function localizeAssetUrls(nodes, assetSummaries = []) {
+  const downloader = lanhuClient
+    ? sourceUrl => lanhuClient.fetchBinaryWithMetadata(sourceUrl)
+    : undefined;
+  const localizer = downloader ? new AssetLocalizer(downloader) : new AssetLocalizer();
+
+  return localizer.localize(nodes, assetSummaries, {
+    outputDir: localAssetDir,
+    publicPathPrefix: buildAssetPublicPath(localAssetDir),
+  });
 }
 
 function sortByPaint(nodes) {
@@ -541,6 +563,25 @@ function textContainerStyles(node, offsetX = 0, offsetY = 0, mode = 'absolute') 
   return styles.join(';');
 }
 
+function assetWrapperStyles(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
+  const styles = [
+    boxStyles(node, {
+      offsetX,
+      offsetY,
+      mode,
+      includeVisual: false,
+    }),
+  ];
+
+  const radius = radiusValue(node);
+  if (radius) {
+    styles.push(`border-radius:${radius}`);
+    styles.push('overflow:hidden');
+  }
+
+  return styles.filter(Boolean).join(';');
+}
+
 function stylesForRange(range) {
   const styles = [];
   if (range.fontSize) styles.push(`font-size:${range.fontSize}px`);
@@ -626,16 +667,161 @@ function canRenderShapeAsPureBox(node) {
     return false;
   }
 
-  const originType = node.pathData.originType || node.shapeType;
+  const originType = String(node.pathData.originType || node.shapeType || '').trim();
   if (!originType) {
     return false;
   }
 
-  if (node.stroke && !['rectangle', 'ellipse'].includes(originType)) {
+  const normalizedShapeType = originType.toLowerCase();
+  const isRectLike = ['rect', 'rectangle', 'roundedrect'].includes(normalizedShapeType);
+  const isEllipseLike = ['ellipse', 'oval', 'circle'].includes(normalizedShapeType);
+
+  if (node.stroke && !isRectLike && !isEllipseLike) {
     return false;
   }
 
-  return ['rectangle', 'ellipse'].includes(originType) || node.borderRadius !== undefined;
+  return isRectLike || isEllipseLike;
+}
+
+function getEllipseComponentBounds(component) {
+  const bounds = component?.originBounds;
+  if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+    return null;
+  }
+
+  const originType = String(component.originType || '').trim().toLowerCase();
+  if (!['ellipse', 'oval', 'circle'].includes(originType)) {
+    return null;
+  }
+
+  return bounds;
+}
+
+function getBoundsCenter(bounds) {
+  return {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y + bounds.height / 2,
+  };
+}
+
+function getEllipseDotsLayout(node) {
+  const components = node.pathData?.components || [];
+  if (components.length < 2) {
+    return null;
+  }
+
+  const ellipses = components
+    .filter(component => component.operation === 'add')
+    .map(component => getEllipseComponentBounds(component))
+    .filter(Boolean);
+
+  if (ellipses.length !== components.length) {
+    return null;
+  }
+
+  const sorted = [...ellipses].sort((left, right) => left.x - right.x);
+  const baselineY = getBoundsCenter(sorted[0]).y;
+  const aligned = sorted.every(bounds => Math.abs(getBoundsCenter(bounds).y - baselineY) <= 1.5);
+  if (!aligned) {
+    return null;
+  }
+
+  const nonOverlapping = sorted.every((bounds, index) => (
+    index === 0 || bounds.x >= sorted[index - 1].x + sorted[index - 1].width - 1
+  ));
+  if (!nonOverlapping) {
+    return null;
+  }
+
+  return sorted;
+}
+
+function getEllipseRingLayout(node) {
+  const components = node.pathData?.components || [];
+  if (components.length !== 3) {
+    return null;
+  }
+
+  const [outer, inner, center] = components;
+  if (outer.operation !== 'add' || inner.operation !== 'subtract' || center.operation !== 'add') {
+    return null;
+  }
+
+  const outerBounds = getEllipseComponentBounds(outer);
+  const innerBounds = getEllipseComponentBounds(inner);
+  const centerBounds = getEllipseComponentBounds(center);
+  if (!outerBounds || !innerBounds || !centerBounds) {
+    return null;
+  }
+
+  const outerCenter = getBoundsCenter(outerBounds);
+  const innerCenter = getBoundsCenter(innerBounds);
+  const centerDot = getBoundsCenter(centerBounds);
+  const ringAligned = Math.abs(outerCenter.x - innerCenter.x) <= 1.5
+    && Math.abs(outerCenter.y - innerCenter.y) <= 1.5
+    && Math.abs(outerCenter.x - centerDot.x) <= 1.5
+    && Math.abs(outerCenter.y - centerDot.y) <= 1.5;
+
+  if (!ringAligned) {
+    return null;
+  }
+
+  const ringThicknessX = (outerBounds.width - innerBounds.width) / 2;
+  const ringThicknessY = (outerBounds.height - innerBounds.height) / 2;
+  if (ringThicknessX <= 0 || ringThicknessY <= 0) {
+    return null;
+  }
+
+  return {
+    ringThickness: Number(Math.max(1, Math.min(ringThicknessX, ringThicknessY)).toFixed(2)),
+    centerBounds,
+  };
+}
+
+function renderEllipseDotsShape(node, ellipseBounds, offsetX = 0, offsetY = 0, mode = 'absolute', className = 'shape') {
+  const wrapperStyle = [
+    boxStyles(node, { offsetX, offsetY, mode, includeVisual: false }),
+    'display:flex',
+    'align-items:center',
+    'justify-content:space-between',
+  ].join(';');
+  const fill = node.fill || '#000000';
+  const dotsHtml = ellipseBounds.map(bounds => {
+    const dotStyle = [
+      `width:${bounds.width}px`,
+      `height:${bounds.height}px`,
+      `background:${fill}`,
+      'border-radius:9999px',
+      'flex:0 0 auto',
+    ].join(';');
+
+    return `<span ${renderClassAttr('shape-dot', 'shape-dot', dotStyle)}></span>`;
+  }).join('');
+
+  return `<div ${renderClassAttr(`layer ${className}`, `${className}-layer`, wrapperStyle)} ${layerAttrs(node)}>${dotsHtml}</div>`;
+}
+
+function renderEllipseRingShape(node, ringLayout, offsetX = 0, offsetY = 0, mode = 'absolute', className = 'shape') {
+  const fill = node.fill || '#000000';
+  const wrapperStyle = [
+    boxStyles(node, { offsetX, offsetY, mode, includeVisual: false }),
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
+    `border:${ringLayout.ringThickness}px solid ${fill}`,
+    'border-radius:9999px',
+    'box-sizing:border-box',
+    'background:transparent',
+  ].join(';');
+  const dotStyle = [
+    `width:${ringLayout.centerBounds.width}px`,
+    `height:${ringLayout.centerBounds.height}px`,
+    `background:${fill}`,
+    'border-radius:9999px',
+    'flex:0 0 auto',
+  ].join(';');
+
+  return `<div ${renderClassAttr(`layer ${className}`, `${className}-layer`, wrapperStyle)} ${layerAttrs(node)}><span ${renderClassAttr('shape-dot center-dot', 'shape-dot', dotStyle)}></span></div>`;
 }
 
 function isSmallIconLikeNode(node) {
@@ -662,6 +848,10 @@ function hasRenderableVectorChildren(node) {
 
 function shouldRenderAssetAsVector(node) {
   if (node.renderStrategy !== 'asset' || !isSmallIconLikeNode(node)) {
+    return false;
+  }
+
+  if (node.assetUrl) {
     return false;
   }
 
@@ -793,12 +983,19 @@ function renderTextContent(node) {
 
 function renderShapeNode(node, offsetX = 0, offsetY = 0, mode = 'absolute', className = 'shape') {
   if (canRenderShapeAsPureBox(node)) {
-    const wrapperStyle = [
-      boxStyles(node, { offsetX, offsetY, mode }),
-      shapeClipStyles(node, node.bounds),
-    ].filter(Boolean).join(';');
+    const wrapperStyle = boxStyles(node, { offsetX, offsetY, mode });
 
     return `<div ${renderClassAttr(`layer ${className}`, `${className}-layer`, wrapperStyle)} ${layerAttrs(node)}></div>`;
+  }
+
+  const ellipseDotsLayout = getEllipseDotsLayout(node);
+  if (ellipseDotsLayout) {
+    return renderEllipseDotsShape(node, ellipseDotsLayout, offsetX, offsetY, mode, className);
+  }
+
+  const ellipseRingLayout = getEllipseRingLayout(node);
+  if (ellipseRingLayout) {
+    return renderEllipseRingShape(node, ellipseRingLayout, offsetX, offsetY, mode, className);
   }
 
   const pathBounds = node.pathData.pathBounds || node.bounds;
@@ -873,6 +1070,10 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
     return renderBitmapFallback(node, offsetX, offsetY, mode);
   }
 
+  if (node.assetUrl) {
+    return `<div ${renderClassAttr('layer asset', 'asset-layer', assetWrapperStyles(node, offsetX, offsetY, mode))} ${layerAttrs(node)}><img src="${node.assetUrl}" ${renderClassAttr('asset-image', 'asset-image', 'width:100%;height:100%;display:block;object-fit:fill;pointer-events:none;background:transparent;border-radius:inherit')} /></div>`;
+  }
+
   if (shouldRenderAssetAsVector(node)) {
     if (node.pathData?.components?.length) {
       return renderShapeNode(node, offsetX, offsetY, mode, 'asset-shape');
@@ -881,10 +1082,6 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
     if (node.children?.length) {
       return renderAssetVectorGroup(node, offsetX, offsetY, mode);
     }
-  }
-
-  if (node.renderStrategy === 'asset' && node.assetUrl) {
-    return `<div ${renderClassAttr('layer asset', 'asset-layer', boxStyles(node, { offsetX, offsetY, mode }))} ${layerAttrs(node)}><img src="${node.assetUrl}" ${renderClassAttr('asset-image', 'asset-image', 'width:100%;height:100%;display:block;object-fit:fill;pointer-events:none')} /></div>`;
   }
 
   if (node.text) {
@@ -904,25 +1101,69 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
 
 function renderBitmapFallback(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
   if (/头像/.test(node.name || '')) {
-    const wrapperStyle = boxStyles(node, {
-      offsetX,
-      offsetY,
-      mode,
-      includeVisual: false,
-    });
+    const wrapperStyle = [
+      boxStyles(node, {
+        offsetX,
+        offsetY,
+        mode,
+        includeVisual: false,
+      }),
+      'display:flex',
+      'flex-direction:column',
+      'align-items:center',
+      'justify-content:center',
+      'gap:4px',
+    ].join(';');
     const iconColor = '#8e9cb3';
-    return `<div ${renderClassAttr('layer bitmap-fallback avatar', 'avatar-fallback', wrapperStyle)} ${layerAttrs(node)}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" ${renderClassAttr('fallback-icon-svg', 'fallback-icon-svg', 'width:100%;height:100%;display:block;pointer-events:none')}><circle cx="24" cy="17" r="8" fill="${iconColor}" /><path d="M10 39c1.8-8.2 8.1-12.3 14-12.3S36.2 30.8 38 39" fill="${iconColor}" /></svg></div>`;
+    const headStyle = [
+      'width:16px',
+      'height:16px',
+      `background:${iconColor}`,
+      'border-radius:9999px',
+      'flex:0 0 auto',
+    ].join(';');
+    const bodyStyle = [
+      'width:28px',
+      'height:14px',
+      `background:${iconColor}`,
+      'border-radius:14px 14px 8px 8px',
+      'flex:0 0 auto',
+    ].join(';');
+
+    return `<div ${renderClassAttr('layer bitmap-fallback avatar', 'avatar-fallback', wrapperStyle)} ${layerAttrs(node)}><span ${renderClassAttr('avatar-fallback-head', 'avatar-fallback-head', headStyle)}></span><span ${renderClassAttr('avatar-fallback-body', 'avatar-fallback-body', bodyStyle)}></span></div>`;
   }
 
   if (node.name === '我的') {
-    const wrapperStyle = boxStyles(node, {
-      offsetX,
-      offsetY,
-      mode,
-      includeVisual: false,
-    });
+    const wrapperStyle = [
+      boxStyles(node, {
+        offsetX,
+        offsetY,
+        mode,
+        includeVisual: false,
+      }),
+      'display:flex',
+      'flex-direction:column',
+      'align-items:center',
+      'justify-content:center',
+      'gap:4px',
+    ].join(';');
     const iconColor = '#c6c6c6';
-    return `<div ${renderClassAttr('layer bitmap-fallback profile', 'profile-fallback', wrapperStyle)} ${layerAttrs(node)}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" ${renderClassAttr('fallback-icon-svg', 'fallback-icon-svg', 'width:100%;height:100%;display:block;pointer-events:none')}><circle cx="24" cy="18" r="8" fill="${iconColor}" /><path d="M11 39c1.7-7.7 7.7-11.5 13-11.5S35.3 31.3 37 39" fill="${iconColor}" /></svg></div>`;
+    const headStyle = [
+      'width:15px',
+      'height:15px',
+      `background:${iconColor}`,
+      'border-radius:9999px',
+      'flex:0 0 auto',
+    ].join(';');
+    const bodyStyle = [
+      'width:26px',
+      'height:13px',
+      `background:${iconColor}`,
+      'border-radius:13px 13px 8px 8px',
+      'flex:0 0 auto',
+    ].join(';');
+
+    return `<div ${renderClassAttr('layer bitmap-fallback profile', 'profile-fallback', wrapperStyle)} ${layerAttrs(node)}><span ${renderClassAttr('profile-fallback-head', 'profile-fallback-head', headStyle)}></span><span ${renderClassAttr('profile-fallback-body', 'profile-fallback-body', bodyStyle)}></span></div>`;
   }
 
   if (node.name === 'Path' && node.bounds.y <= 40 && node.bounds.width >= 600) {
@@ -1885,7 +2126,7 @@ ${generatedCss}
 </html>`;
 
 await fs.writeFile(htmlPath, html, 'utf8');
-await fs.writeFile(parsedPath, JSON.stringify({ artboard, restoration, layers }, null, 2), 'utf8');
+await fs.writeFile(parsedPath, JSON.stringify({ artboard, restoration, localizedAssets, layers }, null, 2), 'utf8');
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({
@@ -1925,6 +2166,7 @@ const result = {
   artboard,
   rootLayerCount: layers.length,
   restoration,
+  localizedAssets,
   htmlPath,
   parsedPath,
   screenshotPath,

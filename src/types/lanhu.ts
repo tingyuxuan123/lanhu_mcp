@@ -499,6 +499,9 @@ export interface SimplifiedLayer {
   adjustment?: SimplifiedAdjustment;
   assetUrl?: string;
   assetUrls?: Record<string, string>;
+  remoteAssetUrl?: string;
+  localAssetPath?: string;
+  localAssetFilePath?: string;
   renderStrategy?: SimplifiedRenderStrategy;
   shouldRenderChildren?: boolean;
   layoutHint?: SimplifiedLayoutHint;
@@ -531,6 +534,9 @@ export interface AssetSummary {
   bounds: SimplifiedBounds;
   assetUrl?: string;
   assetUrls?: Record<string, string>;
+  remoteAssetUrl?: string;
+  localAssetPath?: string;
+  localAssetFilePath?: string;
 }
 
 export interface DesignTokens {
@@ -573,4 +579,31 @@ export interface RestorationPlan {
   textAutoSizeIds: number[];
   maskGroups: RestorationMaskGroup[];
   guidance: string[];
+}
+
+export interface LocalizedAssetFile {
+  fileName: string;
+  localPath: string;
+  filePath: string;
+  contentHash: string;
+  contentType?: string;
+  sourceUrl: string;
+  size: number;
+}
+
+export interface AssetLocalizationFailure {
+  sourceUrl: string;
+  layerId?: number;
+  layerName?: string;
+  error: string;
+}
+
+export interface AssetLocalizationResult {
+  directory: string | null;
+  outputDir: string | null;
+  publicPathPrefix: string | null;
+  localizedAssetCount: number;
+  downloadedFileCount: number;
+  files: LocalizedAssetFile[];
+  failures: AssetLocalizationFailure[];
 }

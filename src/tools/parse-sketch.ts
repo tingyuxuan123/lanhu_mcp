@@ -1,9 +1,11 @@
 ﻿import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { cookieManager } from '../config/cookie-manager.js';
+import { assetLocalizer } from '../services/asset-localizer.js';
 import { LanhuClient } from '../services/lanhu-client.js';
 import { LanhuParser } from '../services/lanhu-parser.js';
 import { OutputFormat, StyleExtractor } from '../services/style-extractor.js';
+import { buildAssetPublicPath, buildDefaultAssetOutputDir } from '../utils/asset-localization.js';
 import { logger } from '../utils/logger.js';
 
 export const parseSketchTool = {
@@ -17,6 +19,9 @@ export const parseSketchTool = {
     include_invisible: z.boolean().optional().default(false).describe('Whether to include invisible layers'),
     normalize_to_artboard: z.boolean().optional().default(true).describe('Whether bounds.x/y are relative to artboard'),
     max_depth: z.number().min(1).max(30).optional().default(20).describe('Maximum layer tree depth'),
+    download_assets: z.boolean().optional().default(true).describe('Whether to download remote asset URLs and replace them with local paths'),
+    asset_output_dir: z.string().optional().describe('Optional local output directory for downloaded assets'),
+    asset_public_path: z.string().optional().describe('Optional public path prefix written back into assetUrl/localAssetPath'),
   },
 };
 
@@ -35,6 +40,9 @@ export function registerParseSketchTool(server: McpServer): void {
       include_invisible?: boolean;
       normalize_to_artboard?: boolean;
       max_depth?: number;
+      download_assets?: boolean;
+      asset_output_dir?: string;
+      asset_public_path?: string;
     }) => {
       try {
         const cookie = params.cookie || (cookieManager.hasCookie() ? cookieManager.getCookie() : '');
@@ -61,6 +69,13 @@ export function registerParseSketchTool(server: McpServer): void {
           includeInvisible: params.include_invisible ?? false,
           normalizeToArtboard: params.normalize_to_artboard ?? true,
         });
+        const assetOutputDir = params.asset_output_dir || buildDefaultAssetOutputDir(document.board.name, params.json_url);
+        const localizedAssets = params.download_assets === false
+          ? undefined
+          : await assetLocalizer.localize(layers, assets, {
+              outputDir: assetOutputDir,
+              publicPathPrefix: buildAssetPublicPath(assetOutputDir, params.asset_public_path),
+            });
 
         const result: {
           success: boolean;
@@ -75,6 +90,7 @@ export function registerParseSketchTool(server: McpServer): void {
             assets: typeof assets;
             tokens: typeof tokens;
             renderHints: string[];
+            localizedAssets?: typeof localizedAssets;
             styles?: string;
           };
         } = {
@@ -89,9 +105,11 @@ export function registerParseSketchTool(server: McpServer): void {
             textLayers,
             assets,
             tokens,
+            localizedAssets,
             renderHints: [
               'bounds.x / bounds.y are artboard-relative by default, while bounds.absoluteX / bounds.absoluteY keep original design coordinates.',
               'assetUrl prefers the highest-density image exposed by Lanhu.',
+              'download_assets=true 时，assetUrl 会被替换为本地路径，remoteAssetUrl 保留原始蓝湖地址，localizedAssets 给出落盘清单。',
               'shapeType、borderRadius、pathSummary、textStyleRanges、textMetrics 可用于更高保真地还原图标、圆角和文本字重混排。',
               'restoration.paintOrder / maskGroups / clippedLayerIds 显式给出了绘制顺序和 clipping mask 关系。',
               'boundsMetadata.frame / visual / original 需要按不同用途使用，不能再只依赖单一 bounds。',
