@@ -334,8 +334,11 @@
     ],
     "flexContainerIds": [
       24609,
+      24608,
+      24603,
       24597,
-      24580,
+      24581,
+      24565,
       30546,
       30537,
       30523,
@@ -359,7 +362,6 @@
       30135,
       30133,
       30093,
-      30091,
       30082,
       30079,
       24228,
@@ -928,6 +930,31 @@
               "sizeHint": {
                 "width": "fixed",
                 "height": "fixed"
+              },
+              "layoutHint": {
+                "mode": "flex-column",
+                "itemIds": [
+                  24607,
+                  24606
+                ],
+                "overlayIds": [],
+                "gap": 7,
+                "padding": {
+                  "left": 48,
+                  "top": 0,
+                  "right": 48,
+                  "bottom": 0
+                },
+                "justifyContent": "space-between",
+                "alignItems": "center",
+                "contentBounds": {
+                  "x": 636,
+                  "y": 1441,
+                  "width": 44,
+                  "height": 75,
+                  "absoluteX": 3186,
+                  "absoluteY": 1441
+                }
               }
             },
             {
@@ -2107,6 +2134,31 @@
               "sizeHint": {
                 "width": "fixed",
                 "height": "fixed"
+              },
+              "layoutHint": {
+                "mode": "flex-column",
+                "itemIds": [
+                  24602,
+                  24601
+                ],
+                "overlayIds": [],
+                "gap": 9,
+                "padding": {
+                  "left": 27,
+                  "top": 3,
+                  "right": 27,
+                  "bottom": 0
+                },
+                "justifyContent": "space-between",
+                "alignItems": "center",
+                "contentBounds": {
+                  "x": 473,
+                  "y": 1444,
+                  "width": 86,
+                  "height": 72,
+                  "absoluteX": 3046,
+                  "absoluteY": 1444
+                }
               }
             },
             {
@@ -4285,69 +4337,6 @@
                   "sizeHint": {
                     "width": "fixed",
                     "height": "fixed"
-                  },
-                  "layoutHint": {
-                    "mode": "flex-column",
-                    "itemIds": [
-                      24577,
-                      24578,
-                      24579
-                    ],
-                    "overlayIds": [
-                      24576
-                    ],
-                    "gap": 0,
-                    "padding": {
-                      "left": 6.28,
-                      "top": 4,
-                      "right": 6.25,
-                      "bottom": 11
-                    },
-                    "justifyContent": "start",
-                    "alignItems": "stretch",
-                    "contentBounds": {
-                      "x": 216,
-                      "y": 1448,
-                      "width": 36,
-                      "height": 27,
-                      "absoluteX": 2794,
-                      "absoluteY": 1470
-                    },
-                    "lines": [
-                      {
-                        "itemIds": [
-                          24577
-                        ],
-                        "bounds": {
-                          "x": 219.9699999999998,
-                          "y": 1448,
-                          "width": 27.7800000000002,
-                          "height": 11,
-                          "absoluteX": 2769.97,
-                          "absoluteY": 1448
-                        },
-                        "gap": 0,
-                        "justifyContent": "start",
-                        "alignItems": "start"
-                      },
-                      {
-                        "itemIds": [
-                          24578,
-                          24579
-                        ],
-                        "bounds": {
-                          "x": 216,
-                          "y": 1470,
-                          "width": 36,
-                          "height": 5,
-                          "absoluteX": 2766,
-                          "absoluteY": 1470
-                        },
-                        "gap": 20,
-                        "justifyContent": "space-between",
-                        "alignItems": "center"
-                      }
-                    ]
                   }
                 },
                 {
@@ -4493,6 +4482,31 @@
               "sizeHint": {
                 "width": "fixed",
                 "height": "fixed"
+              },
+              "layoutHint": {
+                "mode": "flex-column",
+                "itemIds": [
+                  24580,
+                  24573
+                ],
+                "overlayIds": [],
+                "gap": 9,
+                "padding": {
+                  "left": 45.72,
+                  "top": 3,
+                  "right": 45.75,
+                  "bottom": 0
+                },
+                "justifyContent": "space-between",
+                "alignItems": "center",
+                "contentBounds": {
+                  "x": 209.7199999999998,
+                  "y": 1444,
+                  "width": 48.5300000000002,
+                  "height": 72,
+                  "absoluteX": 2759.72,
+                  "absoluteY": 1444
+                }
               }
             },
             {
@@ -4748,6 +4762,31 @@
               "sizeHint": {
                 "width": "fixed",
                 "height": "fixed"
+              },
+              "layoutHint": {
+                "mode": "flex-column",
+                "itemIds": [
+                  24564,
+                  24563
+                ],
+                "overlayIds": [],
+                "gap": 9,
+                "padding": {
+                  "left": 48,
+                  "top": 0,
+                  "right": 48,
+                  "bottom": 0
+                },
+                "justifyContent": "space-between",
+                "alignItems": "center",
+                "contentBounds": {
+                  "x": 72,
+                  "y": 1441,
+                  "width": 44,
+                  "height": 75,
+                  "absoluteX": 2622,
+                  "absoluteY": 1441
+                }
               }
             }
           ],
@@ -20316,9 +20355,7 @@
                       30161,
                       30146
                     ],
-                    "overlayIds": [
-                      30137
-                    ],
+                    "overlayIds": [],
                     "gap": 18,
                     "padding": {
                       "left": 56,
@@ -23568,9 +23605,7 @@
                       30163,
                       30128
                     ],
-                    "overlayIds": [
-                      30127
-                    ],
+                    "overlayIds": [],
                     "gap": 17,
                     "padding": {
                       "left": 58,
@@ -26346,35 +26381,6 @@
                       "sizeHint": {
                         "width": "fixed",
                         "height": "fixed"
-                      },
-                      "layoutHint": {
-                        "mode": "flex-column",
-                        "itemIds": [
-                          30086,
-                          30087,
-                          30088
-                        ],
-                        "overlayIds": [
-                          30090,
-                          30089
-                        ],
-                        "gap": 2,
-                        "padding": {
-                          "left": 8,
-                          "top": 2,
-                          "right": 7,
-                          "bottom": 8
-                        },
-                        "justifyContent": "space-between",
-                        "alignItems": "center",
-                        "contentBounds": {
-                          "x": 264,
-                          "y": 294,
-                          "width": 49,
-                          "height": 48,
-                          "absoluteX": 2823,
-                          "absoluteY": 294
-                        }
                       }
                     },
                     {
@@ -26637,9 +26643,7 @@
                       30091,
                       30092
                     ],
-                    "overlayIds": [
-                      30084
-                    ],
+                    "overlayIds": [],
                     "gap": 16,
                     "padding": {
                       "left": 56,
@@ -28426,9 +28430,7 @@
                       30080,
                       30081
                     ],
-                    "overlayIds": [
-                      30070
-                    ],
+                    "overlayIds": [],
                     "gap": 16,
                     "padding": {
                       "left": 56,

@@ -98,6 +98,17 @@ function isRenderable(node) {
   return true;
 }
 
+function isTransparentLeaf(node) {
+  return Boolean(
+    node.opacity !== undefined
+    && node.opacity <= 0.001
+    && !node.text
+    && (!node.children || node.children.length === 0)
+    && !node.clip?.isMask
+    && !node.clip?.clipped
+  );
+}
+
 function isUnresolvedBitmapLayer(node) {
   const rasterLike = node.type === 'layer' || node.type === 'image';
   return Boolean(
@@ -188,10 +199,11 @@ function boxStyles(node, {
   }
 
   if (includeVisual) {
-    if (visualNode.fill) {
-      styles.push(visualNode.fill.startsWith('linear-gradient') || visualNode.fill.startsWith('radial-gradient')
-        ? `background-image:${visualNode.fill}`
-        : `background:${visualNode.fill}`);
+    const visualFill = getVisualFillValue(visualNode);
+    if (visualFill) {
+      styles.push(visualFill.startsWith('linear-gradient') || visualFill.startsWith('radial-gradient')
+        ? `background-image:${visualFill}`
+        : `background:${visualFill}`);
     }
 
     if (visualNode.stroke) {
@@ -238,12 +250,91 @@ function getContainerVisualNode(node) {
   if (
     !candidate
     || !isRenderable(candidate)
-    || candidate.opacity !== undefined && candidate.opacity < 0.99
+    || candidate.opacity !== undefined && candidate.opacity < 0.05
   ) {
     return undefined;
   }
 
   return candidate;
+}
+
+function applyOpacityToColor(color, opacity = 1) {
+  if (!color || opacity >= 0.999) {
+    return color;
+  }
+
+  const normalizedOpacity = Math.max(0, Math.min(1, opacity));
+  const normalizedColor = color.trim().toLowerCase();
+  const hexMatch = normalizedColor.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hexMatch) {
+    const value = hexMatch[1];
+    const expanded = value.length === 3
+      ? value.split('').map(char => char + char).join('')
+      : value;
+    const red = parseInt(expanded.slice(0, 2), 16);
+    const green = parseInt(expanded.slice(2, 4), 16);
+    const blue = parseInt(expanded.slice(4, 6), 16);
+    return `rgba(${red}, ${green}, ${blue}, ${Number(normalizedOpacity.toFixed(3))})`;
+  }
+
+  const rgbMatch = normalizedColor.match(/^rgba?\(([^)]+)\)$/i);
+  if (rgbMatch) {
+    const parts = rgbMatch[1].split(',').map(part => part.trim());
+    if (parts.length >= 3) {
+      return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${Number(normalizedOpacity.toFixed(3))})`;
+    }
+  }
+
+  return null;
+}
+
+function canInlineVisualOpacity(visualNode) {
+  if (!visualNode || visualNode.opacity === undefined || visualNode.opacity >= 0.999) {
+    return true;
+  }
+
+  return Boolean(
+    visualNode.fill
+    && !visualNode.fill.startsWith('linear-gradient')
+    && !visualNode.fill.startsWith('radial-gradient')
+    && !visualNode.stroke
+    && (!visualNode.shadows || visualNode.shadows.length === 0)
+    && applyOpacityToColor(visualNode.fill, visualNode.opacity)
+  );
+}
+
+function canEmbedVisualNode(node, visualNode) {
+  if (!visualNode) {
+    return false;
+  }
+
+  if (!canInlineVisualOpacity(visualNode)) {
+    return false;
+  }
+
+  const toleranceX = Math.max(3, node.bounds.width * 0.03);
+  const toleranceY = Math.max(3, node.bounds.height * 0.03);
+  const nodeRight = node.bounds.x + node.bounds.width;
+  const nodeBottom = node.bounds.y + node.bounds.height;
+  const visualRight = visualNode.bounds.x + visualNode.bounds.width;
+  const visualBottom = visualNode.bounds.y + visualNode.bounds.height;
+
+  return Math.abs(visualNode.bounds.x - node.bounds.x) <= toleranceX
+    && Math.abs(visualNode.bounds.y - node.bounds.y) <= toleranceY
+    && Math.abs(visualRight - nodeRight) <= toleranceX
+    && Math.abs(visualBottom - nodeBottom) <= toleranceY;
+}
+
+function getVisualFillValue(visualNode) {
+  if (!visualNode?.fill) {
+    return '';
+  }
+
+  if (visualNode.opacity !== undefined && visualNode.opacity < 0.999) {
+    return applyOpacityToColor(visualNode.fill, visualNode.opacity) || visualNode.fill;
+  }
+
+  return visualNode.fill;
 }
 
 function resolveLineHeight(node, style, singleLine) {
@@ -375,6 +466,27 @@ function shapeClipStyles(node, baseBounds) {
   ].join(';');
 }
 
+function canRenderShapeAsPureBox(node) {
+  if (node.renderStrategy !== 'shape' || !node.pathData?.components?.length) {
+    return false;
+  }
+
+  if (node.pathData.hasComplexGeometry) {
+    return false;
+  }
+
+  const originType = node.pathData.originType || node.shapeType;
+  if (!originType) {
+    return false;
+  }
+
+  if (node.stroke && !['rectangle', 'ellipse'].includes(originType)) {
+    return false;
+  }
+
+  return ['rectangle', 'ellipse'].includes(originType) || node.borderRadius !== undefined;
+}
+
 function renderTextContent(node) {
   const text = node.text || '';
   const ranges = node.textStyleRanges || [];
@@ -403,6 +515,10 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
     return '';
   }
 
+  if (isTransparentLeaf(node)) {
+    return '';
+  }
+
   if (isUnresolvedBitmapLayer(node)) {
     return renderBitmapFallback(node, offsetX, offsetY, mode);
   }
@@ -416,6 +532,15 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
   }
 
   if (node.renderStrategy === 'shape' && node.pathData?.components?.length) {
+    if (canRenderShapeAsPureBox(node)) {
+      const wrapperStyle = [
+        boxStyles(node, { offsetX, offsetY, mode }),
+        shapeClipStyles(node, node.bounds),
+      ].filter(Boolean).join(';');
+
+      return `<div class="layer shape" ${layerAttrs(node)} style="${wrapperStyle}"></div>`;
+    }
+
     const pathBounds = node.pathData.pathBounds || node.bounds;
     const wrapperStyle = [
       boxStyles(node, { offsetX, offsetY, mode }),
@@ -496,9 +621,11 @@ function renderBitmapFallback(node, offsetX = 0, offsetY = 0, mode = 'absolute')
       <div>${escapeHtml(statusTimeLabel)}</div>
       <div style="display:flex;align-items:center;gap:6px">
         <span>100%</span>
-        <span style="position:relative;display:inline-block;width:24px;height:11px;border:1.5px solid #111827;border-radius:2px;box-sizing:border-box;padding:1px">
-          <span style="display:block;width:15px;height:100%;background:#111827;border-radius:1px"></span>
-          <span style="position:absolute;right:-3px;top:2px;width:2px;height:5px;background:#111827;border-radius:0 1px 1px 0"></span>
+        <span style="display:inline-flex;align-items:center;gap:2px">
+          <span style="display:inline-flex;width:24px;height:11px;border:1.5px solid #111827;border-radius:2px;box-sizing:border-box;padding:1px">
+            <span style="display:block;width:15px;height:100%;background:#111827;border-radius:1px"></span>
+          </span>
+          <span style="display:inline-block;width:2px;height:5px;background:#111827;border-radius:0 1px 1px 0"></span>
         </span>
       </div>
     </div>`;
@@ -517,30 +644,345 @@ function getLayoutChildren(node) {
 }
 
 function getContainerChildren(node) {
-  const visualNode = getContainerVisualNode(node);
-  const children = (node.children || []).filter(child => child.id !== visualNode?.id);
   return {
-    children,
-    visualNode,
+    children: node.children || [],
+    visualNode: getContainerVisualNode(node),
+  };
+}
+
+function simpleContainerContentLayout(node, children) {
+  if (children.length !== 1) {
+    return null;
+  }
+
+  const [child] = children;
+  if (!isRenderable(child) || child.clip?.isMask || child.clip?.clipped) {
+    return null;
+  }
+
+  const padding = {
+    top: Number((child.bounds.y - node.bounds.y).toFixed(2)),
+    right: Number((node.bounds.x + node.bounds.width - (child.bounds.x + child.bounds.width)).toFixed(2)),
+    bottom: Number((node.bounds.y + node.bounds.height - (child.bounds.y + child.bounds.height)).toFixed(2)),
+    left: Number((child.bounds.x - node.bounds.x).toFixed(2)),
+  };
+  const centeredX = Math.abs(
+    (child.bounds.x + child.bounds.width / 2) - (node.bounds.x + node.bounds.width / 2),
+  ) <= Math.max(2, node.bounds.width * 0.03);
+  const centeredY = Math.abs(
+    (child.bounds.y + child.bounds.height / 2) - (node.bounds.y + node.bounds.height / 2),
+  ) <= Math.max(2, node.bounds.height * 0.08);
+
+  if (centeredX && centeredY) {
+    return {
+      wrapperStyles: [
+        'display:flex',
+        'justify-content:center',
+        'align-items:center',
+        'box-sizing:border-box',
+      ],
+      childrenHtml: renderFlowNode(child),
+    };
+  }
+
+  if (padding.top < 0 || padding.right < 0 || padding.bottom < 0 || padding.left < 0) {
+    return null;
+  }
+
+  return {
+    wrapperStyles: [
+      'display:flex',
+      'justify-content:flex-start',
+      'align-items:flex-start',
+      `padding:${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`,
+      'box-sizing:border-box',
+    ],
+    childrenHtml: renderFlowNode(child),
+  };
+}
+
+function isDetachedBackgroundCandidate(node, child) {
+  if (
+    !isRenderable(child)
+    || child.text
+    || child.clip?.isMask
+    || child.clip?.clipped
+    || child.children?.length
+    || !hasOwnVisual(child)
+  ) {
+    return false;
+  }
+
+  const widthCoverage = child.bounds.width / Math.max(node.bounds.width, 1);
+  const heightCoverage = child.bounds.height / Math.max(node.bounds.height, 1);
+  const leftDelta = Math.abs(child.bounds.x - node.bounds.x);
+  const rightDelta = Math.abs((child.bounds.x + child.bounds.width) - (node.bounds.x + node.bounds.width));
+  const topDelta = Math.abs(child.bounds.y - node.bounds.y);
+  const bottomDelta = Math.abs((child.bounds.y + child.bounds.height) - (node.bounds.y + node.bounds.height));
+
+  return widthCoverage >= 0.92
+    && heightCoverage >= 0.72
+    && leftDelta <= Math.max(4, node.bounds.width * 0.03)
+    && rightDelta <= Math.max(4, node.bounds.width * 0.03)
+    && (topDelta <= Math.max(6, node.bounds.height * 0.04) || bottomDelta <= Math.max(4, node.bounds.height * 0.03));
+}
+
+function getRelativeOffsets(node, child) {
+  return {
+    top: Number((child.bounds.y - node.bounds.y).toFixed(2)),
+    right: Number((node.bounds.x + node.bounds.width - (child.bounds.x + child.bounds.width)).toFixed(2)),
+    bottom: Number((node.bounds.y + node.bounds.height - (child.bounds.y + child.bounds.height)).toFixed(2)),
+    left: Number((child.bounds.x - node.bounds.x).toFixed(2)),
+  };
+}
+
+function buildGridOverlayChild(contentClassName, margin, html) {
+  const styles = [
+    'grid-area:1 / 1',
+    'align-self:start',
+    'justify-self:start',
+  ];
+
+  if (Math.abs(margin.top) > 0.01 || Math.abs(margin.left) > 0.01) {
+    styles.push(`margin:${margin.top}px 0 0 ${margin.left}px`);
+  }
+
+  return `<div class="${contentClassName}" style="${styles.join(';')}">${html}</div>`;
+}
+
+function canUseDetachedGridOverlay(node, visualNode, contentNode, visualOffset, contentOffset) {
+  if (
+    visualOffset.top < 0
+    || visualOffset.right < 0
+    || visualOffset.bottom < 0
+    || visualOffset.left < 0
+    || contentOffset.top < 0
+    || contentOffset.right < 0
+    || contentOffset.bottom < 0
+    || contentOffset.left < 0
+  ) {
+    return false;
+  }
+
+  const overlapX = Math.min(
+    visualNode.bounds.x + visualNode.bounds.width,
+    contentNode.bounds.x + contentNode.bounds.width,
+  ) - Math.max(visualNode.bounds.x, contentNode.bounds.x);
+  const overlapY = Math.min(
+    visualNode.bounds.y + visualNode.bounds.height,
+    contentNode.bounds.y + contentNode.bounds.height,
+  ) - Math.max(visualNode.bounds.y, contentNode.bounds.y);
+
+  return overlapX > Math.min(24, Math.min(visualNode.bounds.width, contentNode.bounds.width) * 0.4)
+    && overlapY > Math.min(24, Math.min(visualNode.bounds.height, contentNode.bounds.height) * 0.4)
+    && (Math.abs(visualOffset.top - contentOffset.top) > 2 || Math.abs(visualOffset.left - contentOffset.left) > 2)
+    && !node.clip?.isMask;
+}
+
+function detachedContainerContentLayout(node, children, insideMask = false) {
+  const backgroundCandidates = children.filter(child => isDetachedBackgroundCandidate(node, child));
+  if (backgroundCandidates.length !== 1) {
+    return null;
+  }
+
+  const [visualNode] = backgroundCandidates;
+  const contentChildren = children.filter(child => child.id !== visualNode.id && isRenderable(child));
+  if (contentChildren.length !== 1) {
+    return null;
+  }
+
+  const [contentNode] = contentChildren;
+  if (contentNode.clip?.isMask || contentNode.clip?.clipped) {
+    return null;
+  }
+
+  const padding = getRelativeOffsets(node, contentNode);
+  const visualOffset = getRelativeOffsets(node, visualNode);
+
+  if (padding.top < 0 || padding.right < 0 || padding.bottom < 0 || padding.left < 0) {
+    return null;
+  }
+
+  if (canUseDetachedGridOverlay(node, visualNode, contentNode, visualOffset, padding)) {
+    return {
+      childrenHtml: [
+        buildGridOverlayChild(
+          'layout-overlay-grid',
+          visualOffset,
+          renderNode(visualNode, 0, 0, 'flow', insideMask),
+        ),
+        buildGridOverlayChild(
+          'layout-content-grid',
+          padding,
+          renderFlowNode(contentNode),
+        ),
+      ].join(''),
+      wrapperStyles: [
+        'display:grid',
+        'grid-template-columns:minmax(0, 1fr)',
+        'grid-template-rows:minmax(0, 1fr)',
+        'box-sizing:border-box',
+      ],
+      overlayHtml: renderNode(visualNode, node.bounds.x, node.bounds.y, 'absolute', insideMask),
+    };
+  }
+
+  return {
+    childrenHtml: `${renderNode(visualNode, node.bounds.x, node.bounds.y, 'absolute', insideMask)}${renderFlowNode(contentNode)}`,
+    overlayHtml: renderNode(visualNode, node.bounds.x, node.bounds.y, 'absolute', insideMask),
+    flowHtml: renderFlowNode(contentNode),
+    wrapperStyles: [
+      'display:flex',
+      'justify-content:flex-start',
+      'align-items:flex-start',
+      `padding:${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`,
+      'box-sizing:border-box',
+    ],
+  };
+}
+
+function singleChildFlowLayout(node, children) {
+  const renderableChildren = children.filter(child => (
+    isRenderable(child)
+    && !child.clip?.isMask
+    && !child.clip?.clipped
+    && (hasVisual(child) || child.layoutHint || child.children?.length || child.text)
+  ));
+  if (renderableChildren.length !== 1) {
+    return null;
+  }
+
+  const [child] = renderableChildren;
+  if (!child.layoutHint && !child.children?.length && !child.text) {
+    return null;
+  }
+
+  const padding = {
+    top: Number((child.bounds.y - node.bounds.y).toFixed(2)),
+    right: Number((node.bounds.x + node.bounds.width - (child.bounds.x + child.bounds.width)).toFixed(2)),
+    bottom: Number((node.bounds.y + node.bounds.height - (child.bounds.y + child.bounds.height)).toFixed(2)),
+    left: Number((child.bounds.x - node.bounds.x).toFixed(2)),
+  };
+  const widthCoverage = child.bounds.width / Math.max(node.bounds.width, 1);
+  const heightCoverage = child.bounds.height / Math.max(node.bounds.height, 1);
+
+  if (
+    padding.top < 0
+    || padding.right < 0
+    || padding.bottom < 0
+    || padding.left < 0
+    || widthCoverage < 0.82
+    || heightCoverage < 0.82
+  ) {
+    return null;
+  }
+
+  return {
+    wrapperStyles: [
+      'display:flex',
+      'justify-content:flex-start',
+      'align-items:flex-start',
+      `padding:${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`,
+      'box-sizing:border-box',
+    ],
+    childrenHtml: renderFlowNode(child),
+  };
+}
+
+function isSimpleMaskPair(maskNode, targetNode) {
+  if (
+    !maskNode
+    || !targetNode
+    || !maskNode.clip?.isMask
+    || !maskNode.clip.targetIds?.includes(targetNode.id)
+    || targetNode.clip?.maskId !== maskNode.id
+    || !isRenderable(maskNode)
+    || !isRenderable(targetNode)
+    || targetNode.children?.length
+  ) {
+    return false;
+  }
+
+  const maxDimension = Math.max(maskNode.bounds.width, maskNode.bounds.height);
+  if (maxDimension > 80) {
+    return false;
+  }
+
+  const tolerance = 1.5;
+  return Math.abs(maskNode.bounds.x - targetNode.bounds.x) <= tolerance
+    && Math.abs(maskNode.bounds.y - targetNode.bounds.y) <= tolerance
+    && Math.abs(maskNode.bounds.width - targetNode.bounds.width) <= tolerance
+    && Math.abs(maskNode.bounds.height - targetNode.bounds.height) <= tolerance;
+}
+
+function simpleMaskedGroupLayout(node, children) {
+  const visibleChildren = children.filter(child => !isTransparentLeaf(child));
+  if (visibleChildren.length !== 2) {
+    return null;
+  }
+
+  const maskNode = visibleChildren.find(child => child.clip?.isMask && child.clip.targetIds?.length === 1);
+  if (!maskNode) {
+    return null;
+  }
+
+  const targetNode = visibleChildren.find(child => child.id === maskNode.clip.targetIds[0]);
+  if (!isSimpleMaskPair(maskNode, targetNode)) {
+    return null;
+  }
+
+  return {
+    visualNode: maskNode,
+    forceClip: true,
+    extraAttrs: `data-mask-source-id="${maskNode.id}"`,
+    wrapperStyles: [
+      shapeClipStyles(maskNode, node.bounds),
+      'display:flex',
+      'justify-content:flex-start',
+      'align-items:flex-start',
+      'box-sizing:border-box',
+    ],
+    childrenHtml: renderNode(targetNode, maskNode.bounds.x, maskNode.bounds.y, 'flow', true),
   };
 }
 
 function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insideMask = false) {
   const { children, visualNode } = getContainerChildren(node);
+  const embeddedVisualNode = canEmbedVisualNode(node, visualNode) ? visualNode : undefined;
+  const contentChildren = embeddedVisualNode
+    ? children.filter(child => child.id !== embeddedVisualNode.id)
+    : children;
+  const simpleFlow = embeddedVisualNode ? simpleContainerContentLayout(node, contentChildren) : null;
+  const detachedFlow = !simpleFlow ? detachedContainerContentLayout(node, contentChildren, insideMask) : null;
+  const maskedFlow = !simpleFlow && !detachedFlow ? simpleMaskedGroupLayout(node, contentChildren) : null;
+  const singleFlow = !simpleFlow && !detachedFlow && !maskedFlow ? singleChildFlowLayout(node, contentChildren) : null;
+  const wrapperVisualNode = embeddedVisualNode || maskedFlow?.visualNode || node;
   const wrapperStyle = [
     boxStyles(node, {
       offsetX,
       offsetY,
       mode,
-      forceClip: false,
-      visualNode: visualNode || node,
+      forceClip: Boolean(maskedFlow?.forceClip),
+      visualNode: wrapperVisualNode,
     }),
-    visualNode ? shapeClipStyles(visualNode, node.bounds) : '',
+    embeddedVisualNode ? shapeClipStyles(embeddedVisualNode, node.bounds) : '',
+    simpleFlow ? simpleFlow.wrapperStyles.join(';') : '',
+    detachedFlow ? detachedFlow.wrapperStyles.join(';') : '',
+    maskedFlow ? maskedFlow.wrapperStyles.join(';') : '',
+    singleFlow ? singleFlow.wrapperStyles.join(';') : '',
   ].filter(Boolean).join(';');
-  const childrenHtml = children.length > 0 && node.shouldRenderChildren !== false
-    ? renderLayerList(children, node.bounds.x, node.bounds.y, 'absolute', insideMask)
-    : '';
-  return `<div class="layer container" ${layerAttrs(node)} style="${wrapperStyle}">${childrenHtml}</div>`;
+  const childrenHtml = contentChildren.length > 0 && node.shouldRenderChildren !== false
+    ? simpleFlow
+      ? simpleFlow.childrenHtml
+      : detachedFlow
+        ? (detachedFlow.childrenHtml || `${detachedFlow.overlayHtml}${detachedFlow.flowHtml}`)
+        : maskedFlow
+          ? maskedFlow.childrenHtml
+          : singleFlow
+          ? singleFlow.childrenHtml
+          : renderLayerList(contentChildren, node.bounds.x, node.bounds.y, 'absolute', insideMask)
+    : detachedFlow?.overlayHtml || detachedFlow?.childrenHtml || '';
+  return `<div class="layer container" ${layerAttrs(node)} ${maskedFlow?.extraAttrs || ''} style="${wrapperStyle}">${childrenHtml}</div>`;
 }
 
 function flexLayoutStyles(node, mode = 'absolute') {
@@ -637,6 +1079,10 @@ function renderFlowNode(node) {
     return '';
   }
 
+  if (isTransparentLeaf(node)) {
+    return '';
+  }
+
   if (node.clip?.isMask && node.clip.targetIds?.length) {
     return renderMaskGroup(node, 0, 0, 'flow');
   }
@@ -655,19 +1101,20 @@ function renderFlowNode(node) {
 function renderFlexNode(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
   const { items, overlays } = getLayoutChildren(node);
   const visualNode = getContainerVisualNode(node);
+  const embeddedVisualNode = canEmbedVisualNode(node, visualNode) ? visualNode : undefined;
   const wrapperStyle = [
     boxStyles(node, {
       offsetX,
       offsetY,
       mode,
       forceClip: false,
-      visualNode: visualNode || node,
+      visualNode: embeddedVisualNode || node,
     }),
-    visualNode ? shapeClipStyles(visualNode, node.bounds) : '',
+    embeddedVisualNode ? shapeClipStyles(embeddedVisualNode, node.bounds) : '',
     flexLayoutStyles(node, mode),
   ].join(';');
   const overlayHtml = overlays
-    .filter(child => child.id !== visualNode?.id)
+    .filter(child => child.id !== embeddedVisualNode?.id)
     .map(child => renderNode(child, node.bounds.x, node.bounds.y, 'absolute', false))
     .join('\n');
   const flowHtml = node.layoutHint?.lines?.length
@@ -681,6 +1128,28 @@ function renderMaskGroup(maskNode, offsetX = 0, offsetY = 0, mode = 'absolute') 
   const targets = (maskNode.clip?.targetIds || [])
     .map(id => nodesById.get(id))
     .filter(Boolean);
+  const simpleTarget = targets.length === 1 && isSimpleMaskPair(maskNode, targets[0])
+    ? targets[0]
+    : null;
+
+  if (simpleTarget) {
+    const wrapperStyles = [
+      boxStyles(maskNode, {
+        offsetX,
+        offsetY,
+        mode,
+        forceClip: true,
+      }),
+      shapeClipStyles(maskNode, maskNode.bounds),
+      'display:flex',
+      'justify-content:flex-start',
+      'align-items:flex-start',
+      'box-sizing:border-box',
+    ].filter(Boolean).join(';');
+    const childHtml = renderNode(simpleTarget, maskNode.bounds.x, maskNode.bounds.y, 'flow', true);
+    return `<div class="layer mask" ${layerAttrs(maskNode)} style="${wrapperStyles}">${childHtml}</div>`;
+  }
+
   const ownMask = hasVisual(maskNode) ? renderOwn(maskNode, offsetX, offsetY, mode) : '';
   const wrapperStyles = [
     boxStyles(maskNode, {
@@ -699,6 +1168,10 @@ function renderMaskGroup(maskNode, offsetX = 0, offsetY = 0, mode = 'absolute') 
 
 function renderNode(node, offsetX = 0, offsetY = 0, mode = 'absolute', insideMask = false) {
   if (!isRenderable(node)) {
+    return '';
+  }
+
+  if (isTransparentLeaf(node)) {
     return '';
   }
 

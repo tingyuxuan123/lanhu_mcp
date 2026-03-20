@@ -335,8 +335,11 @@
     ],
     "flexContainerIds": [
       24609,
+      24608,
+      24603,
       24597,
-      24580,
+      24581,
+      24565,
       30546,
       30537,
       30523,
@@ -360,7 +363,6 @@
       30135,
       30133,
       30093,
-      30091,
       30082,
       30079,
       24228,
@@ -608,11 +610,11 @@
       "height": 1547
     },
     "resizedCandidate": false,
-    "visualDiffPercent": 7.96,
-    "pixelMismatchPercent": 8.7,
-    "meanAbsoluteDiffPercent": 3.06,
-    "weightedDiffPercent": 3.77,
-    "visualSimilarityScore": 96.23,
+    "visualDiffPercent": 8.42,
+    "pixelMismatchPercent": 9.17,
+    "meanAbsoluteDiffPercent": 3.26,
+    "weightedDiffPercent": 3.98,
+    "visualSimilarityScore": 96.02,
     "mismatchBounds": {
       "x": 13,
       "y": 29,
@@ -657,18 +659,18 @@
         "y": 1160,
         "width": 188,
         "height": 194,
-        "diffPercent": 16.29,
-        "weightedDiffPercent": 7.11
+        "diffPercent": 16.32,
+        "weightedDiffPercent": 7.07
       },
       {
-        "row": 6,
+        "row": 5,
         "col": 1,
         "x": 187,
-        "y": 1160,
+        "y": 966,
         "width": 188,
         "height": 194,
-        "diffPercent": 16.8,
-        "weightedDiffPercent": 6.96
+        "diffPercent": 15.18,
+        "weightedDiffPercent": 6.82
       }
     ],
     "suggestions": [

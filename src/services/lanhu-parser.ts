@@ -305,7 +305,10 @@ export class LanhuParser {
       return false;
     }
 
-    const visibleChildren = node.children.filter(child => child.visible !== false);
+    const visibleChildren = node.children.filter(child => (
+      child.visible !== false
+      && !this.shouldIgnoreForLayout(child)
+    ));
     if (visibleChildren.length === 0) {
       return false;
     }
@@ -314,11 +317,18 @@ export class LanhuParser {
   }
 
   private inferLayoutHint(node: SimplifiedLayer): SimplifiedLayer['layoutHint'] {
+    if (node.renderStrategy === 'asset' || node.shouldRenderChildren === false) {
+      return undefined;
+    }
+
     if (!node.children || node.children.length < 2) {
       return undefined;
     }
 
-    const visibleChildren = node.children.filter(child => child.visible !== false);
+    const visibleChildren = node.children.filter(child => (
+      child.visible !== false
+      && !this.shouldIgnoreForLayout(child)
+    ));
     if (visibleChildren.length < 2) {
       return undefined;
     }
@@ -379,6 +389,14 @@ export class LanhuParser {
       .sort((left, right) => this.getContainerVisualScore(node, right) - this.getContainerVisualScore(node, left));
 
     return candidates[0]?.id;
+  }
+
+  private shouldIgnoreForLayout(node: SimplifiedLayer): boolean {
+    if (node.text || node.clip?.isMask || node.clip?.clipped) {
+      return false;
+    }
+
+    return node.opacity !== undefined && node.opacity < 0.05;
   }
 
   private isContainerVisualSource(parent: SimplifiedLayer, child: SimplifiedLayer): boolean {

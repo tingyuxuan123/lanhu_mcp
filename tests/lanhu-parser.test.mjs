@@ -140,3 +140,14 @@ test('parser infers stacked row layouts for recommendation cards', async () => {
   assert.ok(stackedLines.at(-1)?.itemIds.includes(30447));
   assert.ok(restoration.flexContainerIds.includes(30449));
 });
+
+test('parser does not infer flex layouts inside asset-backed icon groups', async () => {
+  const { layers, restoration } = await loadSampleLayers();
+  const all = flatten(layers);
+  const tabIcon = all.find(node => node.id === 24580);
+
+  assert.ok(tabIcon, 'expected tab icon group');
+  assert.equal(tabIcon.renderStrategy, 'asset');
+  assert.equal(tabIcon.layoutHint, undefined);
+  assert.equal(restoration.flexContainerIds.includes(24580), false);
+});
