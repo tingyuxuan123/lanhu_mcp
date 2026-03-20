@@ -4,11 +4,11 @@
     "pageUrl": "https://lanhuapp.com/web/#/item/project/detailDetach?pid=99c9fbd1-d50d-41f8-a8c0-7ab825b0570e&project_id=99c9fbd1-d50d-41f8-a8c0-7ab825b0570e&image_id=a22621e1-2b15-4e09-9856-a5fadd06977d&fromEditor=true",
     "imageId": "a22621e1-2b15-4e09-9856-a5fadd06977d",
     "designName": "5-14-2货主-我的-订阅车源2",
-    "latestVersionId": "37a6edab-0e39-44d3-af97-d27cb5f7b6c3",
-    "latestVersionInfo": "版本2",
-    "jsonUrl": "https://alipic.lanhuapp.com/psz5wrl4gefnjdt1xp0qlgul1s0dvrgqob3c756cbc6-10a8-4126-8241-1957f1569e52",
-    "imageUrl": "https://alipic.lanhuapp.com/ps221w8a20jw4ksd1nqsj734stktsp7cqle2b38223-79fa-48b6-9db3-5b9133283796",
-    "referenceImageUrl": "https://alipic.lanhuapp.com/ps221w8a20jw4ksd1nqsj734stktsp7cqle2b38223-79fa-48b6-9db3-5b9133283796"
+    "latestVersionId": "bf8f487c-7533-416c-af5e-eeee00ecc447",
+    "latestVersionInfo": "版本4",
+    "jsonUrl": "https://alipic.lanhuapp.com/psq8cyuvlaovnvqmkq5d0t9zlmz6yjvz9p458b5b82-46d5-48ff-8881-4f08dbf76240",
+    "imageUrl": "https://alipic.lanhuapp.com/ps414s8jymqoxr7jh3lizk362xl0h8tey7db74e1f1-161e-430a-8f3d-40bc8b313886",
+    "referenceImageUrl": "https://alipic.lanhuapp.com/ps414s8jymqoxr7jh3lizk362xl0h8tey7db74e1f1-161e-430a-8f3d-40bc8b313886"
   },
   "artboard": {
     "name": "5-14-2货主-我的-订阅车源2",
@@ -38,7 +38,10 @@
       11817,
       12009,
       11818,
+      12457,
       11824,
+      12458,
+      12463,
       11825,
       11826,
       11829,
@@ -137,7 +140,8 @@
       12038,
       12023,
       12016,
-      11946
+      11946,
+      12463
     ],
     "textLayerIds": [
       12394,
@@ -230,11 +234,11 @@
       "height": 1547
     },
     "resizedCandidate": false,
-    "visualDiffPercent": 4.48,
-    "pixelMismatchPercent": 5.19,
+    "visualDiffPercent": 4.49,
+    "pixelMismatchPercent": 5.22,
     "meanAbsoluteDiffPercent": 1.83,
-    "weightedDiffPercent": 2.29,
-    "visualSimilarityScore": 97.71,
+    "weightedDiffPercent": 2.3,
+    "visualSimilarityScore": 97.7,
     "mismatchBounds": {
       "x": 0,
       "y": 29,
@@ -249,8 +253,8 @@
         "y": 193,
         "width": 188,
         "height": 194,
-        "diffPercent": 21.54,
-        "weightedDiffPercent": 7.23
+        "diffPercent": 21.55,
+        "weightedDiffPercent": 7.11
       },
       {
         "row": 1,
@@ -260,7 +264,17 @@
         "width": 188,
         "height": 194,
         "diffPercent": 19.95,
-        "weightedDiffPercent": 7.11
+        "weightedDiffPercent": 6.97
+      },
+      {
+        "row": 0,
+        "col": 3,
+        "x": 562,
+        "y": 0,
+        "width": 188,
+        "height": 194,
+        "diffPercent": 10.23,
+        "weightedDiffPercent": 6
       },
       {
         "row": 1,
@@ -270,36 +284,26 @@
         "width": 188,
         "height": 194,
         "diffPercent": 18.46,
-        "weightedDiffPercent": 5.71
+        "weightedDiffPercent": 5.57
       },
       {
         "row": 0,
-        "col": 3,
-        "x": 562,
+        "col": 1,
+        "x": 187,
         "y": 0,
         "width": 188,
         "height": 194,
-        "diffPercent": 8.64,
-        "weightedDiffPercent": 5.08
-      },
-      {
-        "row": 0,
-        "col": 0,
-        "x": 0,
-        "y": 0,
-        "width": 188,
-        "height": 194,
-        "diffPercent": 7.28,
-        "weightedDiffPercent": 4.6
+        "diffPercent": 13.17,
+        "weightedDiffPercent": 4.73
       }
     ],
     "suggestions": [
       "顶部区域差异明显，优先检查状态栏、导航栏、顶部背景和搜索框。",
       "底部区域差异明显，优先检查 TabBar、高亮态和底部留白。",
       "差异覆盖几乎整张图，通常是整体缩放、主背景色或容器宽高不一致。",
-      "重点修正区域：第 2 行第 1 列，加权差异约 7.23%。",
-      "重点修正区域：第 2 行第 3 列，加权差异约 7.11%。",
-      "重点修正区域：第 2 行第 2 列，加权差异约 5.71%。"
+      "重点修正区域：第 2 行第 1 列，加权差异约 7.11%。",
+      "重点修正区域：第 2 行第 3 列，加权差异约 6.97%。",
+      "重点修正区域：第 1 行第 4 列，加权差异约 6%。"
     ],
     "diffImagePath": "D:\\project\\lanhu_mcp\\artifacts\\example-a22621e1\\a22621e1-diff.png"
   }

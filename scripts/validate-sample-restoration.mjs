@@ -217,6 +217,7 @@ function boxStyles(node, {
   offsetY = 0,
   forceClip = false,
   mode = 'absolute',
+  positionContext = false,
   omitWidth,
   omitHeight,
   includeVisual = true,
@@ -230,7 +231,9 @@ function boxStyles(node, {
   ];
 
   if (mode === 'flow') {
-    styles.push('position:relative');
+    if (positionContext) {
+      styles.push('position:relative');
+    }
     styles.push('flex:0 0 auto');
   } else {
     let left = node.bounds.x - offsetX;
@@ -551,6 +554,135 @@ function canRenderShapeAsPureBox(node) {
   return ['rectangle', 'ellipse'].includes(originType) || node.borderRadius !== undefined;
 }
 
+function isSmallIconLikeNode(node) {
+  const maxDimension = Math.max(node.bounds.width, node.bounds.height);
+  const area = node.bounds.width * node.bounds.height;
+  return maxDimension <= 48 && area <= 2304;
+}
+
+function hasRenderableVectorChildren(node) {
+  const children = (node.children || []).filter(child => isRenderable(child) && !isTransparentLeaf(child));
+  if (children.length === 0) {
+    return false;
+  }
+
+  return children.every(child => (
+    Boolean(child.text)
+    || Boolean(child.pathData?.components?.length)
+    || Boolean(child.children?.length)
+    || Boolean(child.fill)
+    || Boolean(child.stroke)
+    || Boolean(child.assetUrl)
+  ));
+}
+
+function shouldRenderAssetAsVector(node) {
+  if (node.renderStrategy !== 'asset' || !isSmallIconLikeNode(node)) {
+    return false;
+  }
+
+  if (node.pathData?.components?.length) {
+    return true;
+  }
+
+  return hasRenderableVectorChildren(node);
+}
+
+function simpleAssetChildrenFlowLayout(node, children) {
+  if (children.length < 2) {
+    return null;
+  }
+
+  const sortedByY = [...children].sort((left, right) => left.bounds.y - right.bounds.y);
+  const alignedLeft = sortedByY.every(child => Math.abs(child.bounds.x - sortedByY[0].bounds.x) <= 1.5);
+  const alignedWidth = sortedByY.every(child => Math.abs(child.bounds.width - sortedByY[0].bounds.width) <= 1.5);
+  const nonOverlappingY = sortedByY.every((child, index) => {
+    if (index === 0) {
+      return true;
+    }
+
+    const previous = sortedByY[index - 1];
+    return child.bounds.y >= previous.bounds.y + previous.bounds.height - 1;
+  });
+
+  if (!alignedLeft || !alignedWidth || !nonOverlappingY) {
+    return null;
+  }
+
+  const childrenHtml = sortedByY.map((child, index) => {
+    const previous = index > 0 ? sortedByY[index - 1] : null;
+    const marginTop = previous
+      ? Number((child.bounds.y - (previous.bounds.y + previous.bounds.height)).toFixed(2))
+      : 0;
+    const wrapperStyles = [
+      'flex:0 0 auto',
+      marginTop > 0 ? `margin-top:${marginTop}px` : '',
+    ].filter(Boolean).join(';');
+
+    return `<div style="${wrapperStyles}">${renderNode(child, 0, 0, 'flow', false)}</div>`;
+  }).join('');
+
+  return {
+    wrapperStyles: [
+      'display:flex',
+      'flex-direction:column',
+      'justify-content:flex-start',
+      'align-items:flex-start',
+      'box-sizing:border-box',
+    ],
+    childrenHtml,
+  };
+}
+
+function centeredAssetChildrenFlowLayout(node, children) {
+  if (children.length !== 2) {
+    return null;
+  }
+
+  const sortedByArea = [...children].sort((left, right) => (
+    right.bounds.width * right.bounds.height
+  ) - (
+    left.bounds.width * left.bounds.height
+  ));
+  const [backgroundNode, foregroundNode] = sortedByArea;
+  const coverageX = backgroundNode.bounds.width / Math.max(node.bounds.width, 1);
+  const coverageY = backgroundNode.bounds.height / Math.max(node.bounds.height, 1);
+  const backgroundCloseToFrame = Math.abs(backgroundNode.bounds.x - node.bounds.x) <= 2
+    && Math.abs(backgroundNode.bounds.y - node.bounds.y) <= 2
+    && Math.abs((backgroundNode.bounds.x + backgroundNode.bounds.width) - (node.bounds.x + node.bounds.width)) <= 2
+    && Math.abs((backgroundNode.bounds.y + backgroundNode.bounds.height) - (node.bounds.y + node.bounds.height)) <= 2;
+  const centeredX = Math.abs(
+    (foregroundNode.bounds.x + foregroundNode.bounds.width / 2)
+    - (backgroundNode.bounds.x + backgroundNode.bounds.width / 2),
+  ) <= Math.max(2, backgroundNode.bounds.width * 0.08);
+  const centeredY = Math.abs(
+    (foregroundNode.bounds.y + foregroundNode.bounds.height / 2)
+    - (backgroundNode.bounds.y + backgroundNode.bounds.height / 2),
+  ) <= Math.max(2, backgroundNode.bounds.height * 0.12);
+
+  if (
+    !backgroundCloseToFrame
+    || coverageX < 0.9
+    || coverageY < 0.9
+    || !centeredX
+    || !centeredY
+    || !hasOwnVisual(backgroundNode)
+  ) {
+    return null;
+  }
+
+  return {
+    visualNode: backgroundNode,
+    wrapperStyles: [
+      'display:flex',
+      'justify-content:center',
+      'align-items:center',
+      'box-sizing:border-box',
+    ],
+    childrenHtml: renderFlowNode(foregroundNode),
+  };
+}
+
 function renderTextContent(node) {
   const text = node.text || '';
   const ranges = node.textStyleRanges || [];
@@ -574,6 +706,73 @@ function renderTextContent(node) {
   return chunks.join('');
 }
 
+function renderShapeNode(node, offsetX = 0, offsetY = 0, mode = 'absolute', className = 'shape') {
+  if (canRenderShapeAsPureBox(node)) {
+    const wrapperStyle = [
+      boxStyles(node, { offsetX, offsetY, mode }),
+      shapeClipStyles(node, node.bounds),
+    ].filter(Boolean).join(';');
+
+    return `<div class="layer ${className}" ${layerAttrs(node)} style="${wrapperStyle}"></div>`;
+  }
+
+  const pathBounds = node.pathData.pathBounds || node.bounds;
+  const wrapperStyle = [
+    boxStyles(node, { offsetX, offsetY, mode }),
+    shapeClipStyles(node, node.bounds),
+  ].filter(Boolean).join(';');
+  const svgStyle = [
+    'display:block',
+    `width:${pathBounds.width}px`,
+    `height:${pathBounds.height}px`,
+    'overflow:visible',
+    (pathBounds.x !== node.bounds.x || pathBounds.y !== node.bounds.y)
+      ? `transform:translate(${pathBounds.x - node.bounds.x}px, ${pathBounds.y - node.bounds.y}px)`
+      : '',
+    'transform-origin:top left',
+  ].join(';');
+  const fill = node.fill && !node.fill.startsWith('linear-gradient') && !node.fill.startsWith('radial-gradient')
+    ? node.fill
+    : 'transparent';
+  const stroke = node.stroke?.color || 'none';
+  const strokeWidth = node.stroke?.width || 0;
+
+  return `<div class="layer ${className}" ${layerAttrs(node)} style="${wrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pathBounds.width} ${pathBounds.height}" style="${svgStyle};pointer-events:none;"><path d="${svgPathForNode(node, pathBounds)}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" fill-rule="evenodd" /></svg></div>`;
+}
+
+function renderAssetVectorGroup(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
+  const children = (node.children || []).filter(child => isRenderable(child) && !isTransparentLeaf(child));
+  if (children.length === 0) {
+    return '';
+  }
+
+  const centeredLayout = centeredAssetChildrenFlowLayout(node, children);
+  const flowLayout = simpleAssetChildrenFlowLayout(node, children);
+
+  const wrapperStyle = [
+    boxStyles(node, {
+      offsetX,
+      offsetY,
+      mode,
+      positionContext: mode === 'flow' && !flowLayout && !centeredLayout,
+      includeVisual: Boolean(centeredLayout),
+      visualNode: centeredLayout?.visualNode || node,
+    }),
+    centeredLayout?.visualNode ? shapeClipStyles(centeredLayout.visualNode, node.bounds) : '',
+    centeredLayout ? centeredLayout.wrapperStyles.join(';') : '',
+    flowLayout ? flowLayout.wrapperStyles.join(';') : '',
+    'overflow:visible',
+  ].filter(Boolean).join(';');
+
+  const childrenHtml = centeredLayout
+    ? centeredLayout.childrenHtml
+    : flowLayout
+    ? flowLayout.childrenHtml
+    : renderLayerList(children, node.bounds.x, node.bounds.y, 'absolute', false);
+
+  return `<div class="layer asset-vector" ${layerAttrs(node)} style="${wrapperStyle}">${childrenHtml}</div>`;
+}
+
 function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
   if (!isRenderable(node)) {
     return '';
@@ -587,6 +786,16 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
     return renderBitmapFallback(node, offsetX, offsetY, mode);
   }
 
+  if (shouldRenderAssetAsVector(node)) {
+    if (node.pathData?.components?.length) {
+      return renderShapeNode(node, offsetX, offsetY, mode, 'asset-shape');
+    }
+
+    if (node.children?.length) {
+      return renderAssetVectorGroup(node, offsetX, offsetY, mode);
+    }
+  }
+
   if (node.renderStrategy === 'asset' && node.assetUrl) {
     return `<div class="layer asset" ${layerAttrs(node)} style="${boxStyles(node, { offsetX, offsetY, mode })}"><img src="${node.assetUrl}" style="width:100%;height:100%;display:block;object-fit:fill;pointer-events:none;" /></div>`;
   }
@@ -596,35 +805,7 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
   }
 
   if (node.renderStrategy === 'shape' && node.pathData?.components?.length) {
-    if (canRenderShapeAsPureBox(node)) {
-      const wrapperStyle = [
-        boxStyles(node, { offsetX, offsetY, mode }),
-        shapeClipStyles(node, node.bounds),
-      ].filter(Boolean).join(';');
-
-      return `<div class="layer shape" ${layerAttrs(node)} style="${wrapperStyle}"></div>`;
-    }
-
-    const pathBounds = node.pathData.pathBounds || node.bounds;
-    const wrapperStyle = [
-      boxStyles(node, { offsetX, offsetY, mode }),
-      shapeClipStyles(node, node.bounds),
-    ].filter(Boolean).join(';');
-    const svgStyle = [
-      'position:absolute',
-      `left:${pathBounds.x - node.bounds.x}px`,
-      `top:${pathBounds.y - node.bounds.y}px`,
-      `width:${pathBounds.width}px`,
-      `height:${pathBounds.height}px`,
-      'overflow:visible',
-    ].join(';');
-    const fill = node.fill && !node.fill.startsWith('linear-gradient') && !node.fill.startsWith('radial-gradient')
-      ? node.fill
-      : 'transparent';
-    const stroke = node.stroke?.color || 'none';
-    const strokeWidth = node.stroke?.width || 0;
-
-    return `<div class="layer shape" ${layerAttrs(node)} style="${wrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pathBounds.width} ${pathBounds.height}" style="${svgStyle};pointer-events:none;"><path d="${svgPathForNode(node)}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" fill-rule="evenodd" /></svg></div>`;
+    return renderShapeNode(node, offsetX, offsetY, mode);
   }
 
   if (!hasVisual(node)) {
@@ -887,14 +1068,12 @@ function detachedContainerContentLayout(node, children, insideMask = false) {
         'grid-template-rows:minmax(0, 1fr)',
         'box-sizing:border-box',
       ],
-      overlayHtml: renderNode(visualNode, node.bounds.x, node.bounds.y, 'absolute', insideMask),
+      usesAbsoluteLayout: false,
     };
   }
 
   return {
     childrenHtml: `${renderNode(visualNode, node.bounds.x, node.bounds.y, 'absolute', insideMask)}${renderFlowNode(contentNode)}`,
-    overlayHtml: renderNode(visualNode, node.bounds.x, node.bounds.y, 'absolute', insideMask),
-    flowHtml: renderFlowNode(contentNode),
     wrapperStyles: [
       'display:flex',
       'justify-content:flex-start',
@@ -902,6 +1081,7 @@ function detachedContainerContentLayout(node, children, insideMask = false) {
       `padding:${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`,
       'box-sizing:border-box',
     ],
+    usesAbsoluteLayout: true,
   };
 }
 
@@ -917,7 +1097,7 @@ function singleChildFlowLayout(node, children) {
   }
 
   const [child] = renderableChildren;
-  if (!child.layoutHint && !child.children?.length && !child.text) {
+  if (!child.layoutHint && !child.children?.length && !child.text && !hasOwnVisual(child)) {
     return null;
   }
 
@@ -929,14 +1109,17 @@ function singleChildFlowLayout(node, children) {
   };
   const widthCoverage = child.bounds.width / Math.max(node.bounds.width, 1);
   const heightCoverage = child.bounds.height / Math.max(node.bounds.height, 1);
+  const isIconSizedFlow = isSmallIconLikeNode(node) || isSmallIconLikeNode(child);
+  const minWidthCoverage = isIconSizedFlow ? 0.6 : 0.82;
+  const minHeightCoverage = isIconSizedFlow ? 0.2 : 0.82;
 
   if (
     padding.top < 0
     || padding.right < 0
     || padding.bottom < 0
     || padding.left < 0
-    || widthCoverage < 0.82
-    || heightCoverage < 0.82
+    || widthCoverage < minWidthCoverage
+    || heightCoverage < minHeightCoverage
   ) {
     return null;
   }
@@ -1010,6 +1193,139 @@ function simpleMaskedGroupLayout(node, children) {
   };
 }
 
+function isBoundsInside(outerBounds, innerBounds, tolerance = 1.5) {
+  return innerBounds.x >= outerBounds.x - tolerance
+    && innerBounds.y >= outerBounds.y - tolerance
+    && innerBounds.x + innerBounds.width <= outerBounds.x + outerBounds.width + tolerance
+    && innerBounds.y + innerBounds.height <= outerBounds.y + outerBounds.height + tolerance;
+}
+
+function renderFlowWrapper(styles, html) {
+  const style = styles.filter(Boolean).join(';');
+  return `<div style="${style}">${html}</div>`;
+}
+
+function toggleControlFlowLayout(node, children) {
+  if (children.length < 4 || children.length > 6 || node.bounds.height > 72) {
+    return null;
+  }
+
+  const textChildren = children.filter(child => child.text);
+  const shapeChildren = children.filter(child => !child.text && hasOwnVisual(child));
+  if (textChildren.length < 2 || textChildren.length > 3 || shapeChildren.length < 2) {
+    return null;
+  }
+
+  const trackNode = [...shapeChildren].sort((left, right) => right.bounds.width - left.bounds.width)[0];
+  const activeNode = shapeChildren.find(child => (
+    child.id !== trackNode.id
+    && isBoundsInside(trackNode.bounds, child.bounds, 1.5)
+    && Math.abs(child.bounds.y - trackNode.bounds.y) <= 2
+    && Math.abs(child.bounds.height - trackNode.bounds.height) <= 2
+    && child.bounds.width < trackNode.bounds.width
+  ));
+
+  if (
+    !trackNode
+    || !activeNode
+    || trackNode.bounds.width < node.bounds.width * 0.45
+    || trackNode.bounds.width >= node.bounds.width
+    || !hasOwnVisual(trackNode)
+    || !hasOwnVisual(activeNode)
+  ) {
+    return null;
+  }
+
+  const outerLabel = textChildren.find(child => child.bounds.x + child.bounds.width <= trackNode.bounds.x + 1.5);
+  const innerTexts = textChildren.filter(child => isBoundsInside(trackNode.bounds, child.bounds, 1.5));
+  const activeText = innerTexts.find(child => isBoundsInside(activeNode.bounds, child.bounds, 2));
+  const inactiveText = innerTexts.find(child => child.id !== activeText?.id);
+  if (!outerLabel || innerTexts.length === 0) {
+    return null;
+  }
+
+  const outerLabelMarginLeft = Number((outerLabel.bounds.x - node.bounds.x).toFixed(2));
+  const trackMarginLeft = Number((trackNode.bounds.x - (outerLabel.bounds.x + outerLabel.bounds.width)).toFixed(2));
+  if (outerLabelMarginLeft < -0.5 || trackMarginLeft < -0.5) {
+    return null;
+  }
+
+  const trackChildren = [];
+  if (inactiveText) {
+    trackChildren.push({
+      marginLeft: Number((inactiveText.bounds.x - trackNode.bounds.x).toFixed(2)),
+      html: renderFlowNode(inactiveText),
+      width: inactiveText.bounds.width,
+    });
+  }
+
+  const activeWrapperStyles = [
+    boxStyles(activeNode, {
+      mode: 'flow',
+    }),
+    'display:flex',
+    'justify-content:center',
+    'align-items:center',
+    'box-sizing:border-box',
+  ].filter(Boolean);
+  const activeContent = activeText ? renderFlowNode(activeText) : '';
+  const activeBlock = {
+    marginLeft: Number((
+      activeNode.bounds.x
+      - trackNode.bounds.x
+      - (trackChildren.length
+        ? trackChildren[trackChildren.length - 1].marginLeft + trackChildren[trackChildren.length - 1].width
+        : 0)
+    ).toFixed(2)),
+    html: renderFlowWrapper(activeWrapperStyles, activeContent),
+  };
+
+  if (activeBlock.marginLeft < -0.5) {
+    return null;
+  }
+
+  const trackHtml = [
+    inactiveText
+      ? renderFlowWrapper([
+        trackChildren[0].marginLeft > 0 ? `margin-left:${trackChildren[0].marginLeft}px` : '',
+      ], trackChildren[0].html)
+      : '',
+    renderFlowWrapper([
+      activeBlock.marginLeft > 0 ? `margin-left:${activeBlock.marginLeft}px` : '',
+      'flex:0 0 auto',
+    ], activeBlock.html),
+  ].filter(Boolean).join('');
+
+  const trackWrapperStyles = [
+    boxStyles(trackNode, {
+      mode: 'flow',
+    }),
+    'display:flex',
+    'align-items:center',
+    'justify-content:flex-start',
+    'box-sizing:border-box',
+  ];
+
+  return {
+    wrapperStyles: [
+      'display:flex',
+      'align-items:center',
+      'justify-content:flex-start',
+      'box-sizing:border-box',
+    ],
+    childrenHtml: [
+      renderFlowWrapper([
+        outerLabelMarginLeft > 0 ? `margin-left:${outerLabelMarginLeft}px` : '',
+        'flex:0 0 auto',
+      ], renderFlowNode(outerLabel)),
+      renderFlowWrapper([
+        trackMarginLeft > 0 ? `margin-left:${trackMarginLeft}px` : '',
+        'flex:0 0 auto',
+      ], renderFlowWrapper(trackWrapperStyles, trackHtml)),
+    ].join(''),
+  };
+}
+
 function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insideMask = false) {
   const { children, visualNode } = getContainerChildren(node);
   const embeddedVisualNode = canEmbedVisualNode(node, visualNode) ? visualNode : undefined;
@@ -1019,13 +1335,21 @@ function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insi
   const simpleFlow = embeddedVisualNode ? simpleContainerContentLayout(node, contentChildren) : null;
   const detachedFlow = !simpleFlow ? detachedContainerContentLayout(node, contentChildren, insideMask) : null;
   const maskedFlow = !simpleFlow && !detachedFlow ? simpleMaskedGroupLayout(node, contentChildren) : null;
-  const singleFlow = !simpleFlow && !detachedFlow && !maskedFlow ? singleChildFlowLayout(node, contentChildren) : null;
+  const toggleFlow = !simpleFlow && !detachedFlow && !maskedFlow ? toggleControlFlowLayout(node, contentChildren) : null;
+  const singleFlow = !simpleFlow && !detachedFlow && !maskedFlow && !toggleFlow
+    ? singleChildFlowLayout(node, contentChildren)
+    : null;
   const wrapperVisualNode = embeddedVisualNode || maskedFlow?.visualNode || node;
+  const usesAbsoluteChildren = mode === 'flow' && contentChildren.length > 0 && node.shouldRenderChildren !== false && (
+    (!simpleFlow && !maskedFlow && !toggleFlow && !singleFlow && !detachedFlow)
+    || Boolean(detachedFlow?.usesAbsoluteLayout)
+  );
   const wrapperStyle = [
     boxStyles(node, {
       offsetX,
       offsetY,
       mode,
+      positionContext: usesAbsoluteChildren,
       forceClip: Boolean(maskedFlow?.forceClip),
       visualNode: wrapperVisualNode,
     }),
@@ -1033,19 +1357,22 @@ function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insi
     simpleFlow ? simpleFlow.wrapperStyles.join(';') : '',
     detachedFlow ? detachedFlow.wrapperStyles.join(';') : '',
     maskedFlow ? maskedFlow.wrapperStyles.join(';') : '',
+    toggleFlow ? toggleFlow.wrapperStyles.join(';') : '',
     singleFlow ? singleFlow.wrapperStyles.join(';') : '',
   ].filter(Boolean).join(';');
   const childrenHtml = contentChildren.length > 0 && node.shouldRenderChildren !== false
     ? simpleFlow
       ? simpleFlow.childrenHtml
       : detachedFlow
-        ? (detachedFlow.childrenHtml || `${detachedFlow.overlayHtml}${detachedFlow.flowHtml}`)
+        ? detachedFlow.childrenHtml
         : maskedFlow
           ? maskedFlow.childrenHtml
+          : toggleFlow
+            ? toggleFlow.childrenHtml
           : singleFlow
-          ? singleFlow.childrenHtml
-          : renderLayerList(contentChildren, node.bounds.x, node.bounds.y, 'absolute', insideMask)
-    : detachedFlow?.overlayHtml || detachedFlow?.childrenHtml || '';
+            ? singleFlow.childrenHtml
+            : renderLayerList(contentChildren, node.bounds.x, node.bounds.y, 'absolute', insideMask)
+    : detachedFlow?.childrenHtml || '';
   return `<div class="layer container" ${layerAttrs(node)} ${maskedFlow?.extraAttrs || ''} style="${wrapperStyle}">${childrenHtml}</div>`;
 }
 
@@ -1110,7 +1437,6 @@ function renderLayoutLines(node) {
       : 0;
     const marginLeft = line.bounds.x - contentBounds.x;
     const styles = [
-      'position:relative',
       'flex:0 0 auto',
       items.length > 1 ? 'display:flex' : 'display:block',
       items.length > 1 ? 'flex-direction:row' : '',
@@ -1166,19 +1492,20 @@ function renderFlexNode(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
   const { items, overlays } = getLayoutChildren(node);
   const visualNode = getContainerVisualNode(node);
   const embeddedVisualNode = canEmbedVisualNode(node, visualNode) ? visualNode : undefined;
+  const visibleOverlays = overlays.filter(child => child.id !== embeddedVisualNode?.id);
   const wrapperStyle = [
     boxStyles(node, {
       offsetX,
       offsetY,
       mode,
+      positionContext: mode === 'flow' && visibleOverlays.length > 0,
       forceClip: false,
       visualNode: embeddedVisualNode || node,
     }),
     embeddedVisualNode ? shapeClipStyles(embeddedVisualNode, node.bounds) : '',
     flexLayoutStyles(node, mode),
   ].join(';');
-  const overlayHtml = overlays
-    .filter(child => child.id !== embeddedVisualNode?.id)
+  const overlayHtml = visibleOverlays
     .map(child => renderNode(child, node.bounds.x, node.bounds.y, 'absolute', false))
     .join('\n');
   const flowHtml = node.layoutHint?.lines?.length
@@ -1220,6 +1547,7 @@ function renderMaskGroup(maskNode, offsetX = 0, offsetY = 0, mode = 'absolute') 
       offsetX,
       offsetY,
       mode,
+      positionContext: mode === 'flow',
       forceClip: true,
     }),
     shapeClipStyles(maskNode, maskNode.bounds),
@@ -1264,6 +1592,187 @@ function renderLayerList(nodes, offsetX = 0, offsetY = 0, mode = 'absolute', ins
   }).join('\n');
 }
 
+function coversArtboard(node) {
+  const widthCoverage = node.bounds.width / Math.max(artboard.width, 1);
+  const heightCoverage = node.bounds.height / Math.max(artboard.height, 1);
+  return node.bounds.x <= Math.max(2, artboard.width * 0.05)
+    && node.bounds.y <= Math.max(2, artboard.height * 0.05)
+    && widthCoverage >= 0.92
+    && heightCoverage >= 0.92;
+}
+
+function isBackdropExtractionCandidate(node, insideBackdrop = false) {
+  if (node.text || hasBitmapFallback(node)) {
+    return false;
+  }
+
+  if (coversArtboard(node)) {
+    return true;
+  }
+
+  if (!insideBackdrop) {
+    return false;
+  }
+
+  const wideCoverage = node.bounds.width / Math.max(artboard.width, 1);
+  return node.bounds.x <= Math.max(3, artboard.width * 0.05)
+    && wideCoverage >= 0.92
+    && (
+      node.bounds.height >= Math.max(120, artboard.height * 0.18)
+      || node.type === 'shape'
+      || node.type === 'image'
+    );
+}
+
+function collectRootBackdropAndContent(nodes) {
+  const backgrounds = [];
+  const contents = [];
+
+  const visit = (node, insideBackdrop = false) => {
+    if (!isRenderable(node) || isTransparentLeaf(node)) {
+      return;
+    }
+
+    const backdropCandidate = isBackdropExtractionCandidate(node, insideBackdrop);
+    if (backdropCandidate && node.children?.length && node.renderStrategy !== 'asset' && !node.text) {
+      for (const child of sortByPaint(node.children)) {
+        visit(child, true);
+      }
+      return;
+    }
+
+    if (backdropCandidate) {
+      backgrounds.push(node);
+      return;
+    }
+
+    contents.push(node);
+  };
+
+  for (const node of sortByPaint(nodes)) {
+    visit(node, false);
+  }
+
+  return { backgrounds, contents };
+}
+
+function canShareRootFlowRow(row, node) {
+  const nodeTop = node.bounds.y;
+  const nodeBottom = node.bounds.y + node.bounds.height;
+  const verticalOverlap = Math.min(row.bottom, nodeBottom) - Math.max(row.top, nodeTop);
+  const minOverlap = Math.min(24, Math.min(node.bounds.height, row.bottom - row.top) * 0.35);
+  if (verticalOverlap <= minOverlap) {
+    return false;
+  }
+
+  return row.nodes.every(existing => {
+    const overlapX = Math.min(
+      existing.bounds.x + existing.bounds.width,
+      node.bounds.x + node.bounds.width,
+    ) - Math.max(existing.bounds.x, node.bounds.x);
+    return overlapX <= Math.min(24, Math.min(existing.bounds.width, node.bounds.width) * 0.18);
+  });
+}
+
+function buildRootFlowRows(nodes) {
+  const sorted = [...nodes].sort((left, right) => (
+    left.bounds.y - right.bounds.y
+    || left.bounds.x - right.bounds.x
+  ));
+  const rows = [];
+
+  for (const node of sorted) {
+    const lastRow = rows[rows.length - 1];
+    if (lastRow && canShareRootFlowRow(lastRow, node)) {
+      lastRow.nodes.push(node);
+      lastRow.top = Math.min(lastRow.top, node.bounds.y);
+      lastRow.bottom = Math.max(lastRow.bottom, node.bounds.y + node.bounds.height);
+      lastRow.left = Math.min(lastRow.left, node.bounds.x);
+      lastRow.right = Math.max(lastRow.right, node.bounds.x + node.bounds.width);
+      continue;
+    }
+
+    rows.push({
+      nodes: [node],
+      top: node.bounds.y,
+      bottom: node.bounds.y + node.bounds.height,
+      left: node.bounds.x,
+      right: node.bounds.x + node.bounds.width,
+    });
+  }
+
+  return rows.map(row => ({
+    ...row,
+    nodes: row.nodes.sort((left, right) => left.bounds.x - right.bounds.x),
+  }));
+}
+
+function renderGridPlacedNode(node, mode = 'flow') {
+  const html = renderNode(node, 0, 0, mode, false);
+  if (!html) {
+    return '';
+  }
+
+  const styles = [
+    'grid-area:1 / 1',
+    'align-self:start',
+    'justify-self:start',
+    Math.abs(node.bounds.y) > 0.01 ? `margin-top:${node.bounds.y}px` : '',
+    Math.abs(node.bounds.x) > 0.01 ? `margin-left:${node.bounds.x}px` : '',
+  ].filter(Boolean).join(';');
+
+  return `<div style="${styles}">${html}</div>`;
+}
+
+function renderRootFlowContent(nodes) {
+  const rows = buildRootFlowRows(nodes);
+  return rows.map((row, index) => {
+    const previousRow = index > 0 ? rows[index - 1] : null;
+    const marginTop = previousRow ? row.top - previousRow.bottom : row.top;
+    const rowStyles = [
+      'display:flex',
+      'justify-content:flex-start',
+      'align-items:flex-start',
+      'box-sizing:border-box',
+      Math.abs(marginTop) > 0.01 ? `margin-top:${marginTop}px` : '',
+      Math.abs(row.left) > 0.01 ? `margin-left:${row.left}px` : '',
+    ];
+
+    let cursorX = row.left;
+    const childrenHtml = row.nodes.map(node => {
+      const marginLeft = node.bounds.x - cursorX;
+      const marginTopWithinRow = node.bounds.y - row.top;
+      cursorX = node.bounds.x + node.bounds.width;
+      const wrapperStyles = [
+        'flex:0 0 auto',
+        Math.abs(marginLeft) > 0.01 ? `margin-left:${marginLeft}px` : '',
+        Math.abs(marginTopWithinRow) > 0.01 ? `margin-top:${marginTopWithinRow}px` : '',
+      ].filter(Boolean).join(';');
+      return `<div style="${wrapperStyles}">${renderFlowNode(node)}</div>`;
+    }).join('');
+
+    return `<div class="root-flow-row" style="${rowStyles.filter(Boolean).join(';')}">${childrenHtml}</div>`;
+  }).join('\n');
+}
+
+function renderRoot(nodes) {
+  const { backgrounds, contents } = collectRootBackdropAndContent(nodes);
+  if (backgrounds.length === 0 || contents.length === 0) {
+    return renderLayerList(nodes);
+  }
+
+  const backgroundHtml = sortByPaint(backgrounds)
+    .map(node => renderGridPlacedNode(node, 'flow'))
+    .filter(Boolean)
+    .join('\n');
+  const contentHtml = renderRootFlowContent(contents);
+
+  return [
+    `<div class="root-background-layer" style="grid-area:1 / 1;z-index:0;display:grid;grid-template-columns:minmax(0, 1fr);grid-template-rows:minmax(0, 1fr);width:${artboard.width}px;height:${artboard.height}px;overflow:hidden;box-sizing:border-box;">${backgroundHtml}</div>`,
+    `<div class="root-content-layer" style="grid-area:1 / 1;z-index:1;display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start;width:${artboard.width}px;height:${artboard.height}px;overflow:hidden;box-sizing:border-box;">${contentHtml}</div>`,
+  ].join('\n');
+}
+
 const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1273,14 +1782,14 @@ const html = `<!DOCTYPE html>
   <style>
     html, body { margin: 0; padding: 0; background: #fff; }
     body { width: ${artboard.width}px; height: ${artboard.height}px; overflow: hidden; }
-    #artboard { position: relative; width: ${artboard.width}px; height: ${artboard.height}px; overflow: hidden; background: #fff; }
-    .layer { position: absolute; }
+    #artboard { display:grid; grid-template-columns:minmax(0, 1fr); grid-template-rows:minmax(0, 1fr); width: ${artboard.width}px; height: ${artboard.height}px; overflow: hidden; background: #fff; }
+    .layer { box-sizing: border-box; }
     .text { -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; user-select: text; }
     #artboard img, #artboard svg, #artboard path { pointer-events: none; }
   </style>
 </head>
 <body>
-  <div id="artboard">${renderLayerList(layers)}</div>
+  <div id="artboard">${renderRoot(layers)}</div>
 </body>
 </html>`;
 
