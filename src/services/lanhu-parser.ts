@@ -338,19 +338,34 @@ export class LanhuParser {
       .filter((layout): layout is NonNullable<typeof layout> => layout !== null)
       .sort((left, right) => right.score - left.score)[0];
 
-    if (!chosen || chosen.score < 1.2) {
+    if (chosen && chosen.score >= 1.2) {
+      return {
+        mode: chosen.direction === 'row' ? 'flex-row' : 'flex-column',
+        itemIds: chosen.items.map(item => item.id),
+        overlayIds,
+        gap: chosen.gap,
+        padding: chosen.padding,
+        justifyContent: chosen.justifyContent,
+        alignItems: chosen.alignItems,
+        contentBounds: chosen.contentBounds,
+      };
+    }
+
+    const stacked = this.measureStackedRowsLayout(node, items);
+    if (!stacked || stacked.score < 2.4) {
       return undefined;
     }
 
     return {
-      mode: chosen.direction === 'row' ? 'flex-row' : 'flex-column',
-      itemIds: chosen.items.map(item => item.id),
+      mode: 'flex-column',
+      itemIds: stacked.items.map(item => item.id),
       overlayIds,
-      gap: chosen.gap,
-      padding: chosen.padding,
-      justifyContent: chosen.justifyContent,
-      alignItems: chosen.alignItems,
-      contentBounds: chosen.contentBounds,
+      gap: 0,
+      padding: stacked.padding,
+      justifyContent: 'start',
+      alignItems: 'stretch',
+      contentBounds: stacked.contentBounds,
+      lines: stacked.lines,
     };
   }
 
@@ -521,6 +536,134 @@ export class LanhuParser {
       contentBounds,
       score,
     };
+  }
+
+  private measureStackedRowsLayout(
+    node: SimplifiedLayer,
+    children: SimplifiedLayer[],
+  ): {
+    items: SimplifiedLayer[];
+    padding: { top: number; right: number; bottom: number; left: number };
+    contentBounds: SimplifiedLayer['bounds'];
+    lines: NonNullable<SimplifiedLayer['layoutHint']>['lines'];
+    score: number;
+  } | null {
+    if (children.length < 2) {
+      return null;
+    }
+
+    const lines = this.groupChildrenIntoRows(children);
+    if (lines.length < 2) {
+      return null;
+    }
+
+    const multiItemLineCount = lines.filter(line => line.length > 1).length;
+    const semanticItemCount = children.filter(child => child.layoutHint || child.text || child.isTextOnlyContainer).length;
+    if (multiItemLineCount === 0 && semanticItemCount < 3) {
+      return null;
+    }
+
+    const contentBounds = this.getBoundingBounds(children);
+    const padding = {
+      left: Number((contentBounds.x - node.bounds.x).toFixed(2)),
+      top: Number((contentBounds.y - node.bounds.y).toFixed(2)),
+      right: Number((node.bounds.x + node.bounds.width - (contentBounds.x + contentBounds.width)).toFixed(2)),
+      bottom: Number((node.bounds.y + node.bounds.height - (contentBounds.y + contentBounds.height)).toFixed(2)),
+    };
+
+    let overlapPenalty = 0;
+    const rowMetadata = lines.map(lineItems => {
+      const ordered = [...lineItems].sort((left, right) => left.bounds.x - right.bounds.x || left.bounds.y - right.bounds.y);
+      const bounds = this.getBoundingBounds(ordered);
+      const rowNode = {
+        ...node,
+        bounds: {
+          ...bounds,
+          x: contentBounds.x,
+          width: contentBounds.width,
+        },
+      } as SimplifiedLayer;
+      const rowLayout = ordered.length > 1
+        ? this.measureLinearLayout(rowNode, ordered, 'row')
+        : null;
+
+      return {
+        items: ordered,
+        bounds,
+        gap: rowLayout?.gap || 0,
+        justifyContent: rowLayout?.justifyContent || 'start',
+        alignItems: rowLayout?.alignItems || 'start',
+      };
+    });
+
+    for (let index = 1; index < rowMetadata.length; index += 1) {
+      const previous = rowMetadata[index - 1];
+      const current = rowMetadata[index];
+      const gap = current.bounds.y - (previous.bounds.y + previous.bounds.height);
+      if (gap < -6) {
+        overlapPenalty += Math.abs(gap);
+      }
+    }
+
+    const verticalCoverage = contentBounds.height / Math.max(node.bounds.height, 1);
+    const score = Number((
+      lines.length
+      + multiItemLineCount * 1.35
+      + semanticItemCount * 0.2
+      + verticalCoverage
+      - overlapPenalty / 12
+    ).toFixed(2));
+
+    if (overlapPenalty > Math.max(18, node.bounds.height * 0.04)) {
+      return null;
+    }
+
+    return {
+      items: rowMetadata.flatMap(line => line.items),
+      padding,
+      contentBounds,
+      lines: rowMetadata.map(line => ({
+        itemIds: line.items.map(item => item.id),
+        bounds: line.bounds,
+        gap: line.gap,
+        justifyContent: line.justifyContent,
+        alignItems: line.alignItems,
+      })),
+      score,
+    };
+  }
+
+  private groupChildrenIntoRows(children: SimplifiedLayer[]): SimplifiedLayer[][] {
+    const ordered = [...children].sort((left, right) => left.bounds.y - right.bounds.y || left.bounds.x - right.bounds.x);
+    const rows: SimplifiedLayer[][] = [];
+
+    for (const child of ordered) {
+      const currentRow = rows[rows.length - 1];
+      if (!currentRow || !this.belongsToRow(currentRow, child)) {
+        rows.push([child]);
+        continue;
+      }
+      currentRow.push(child);
+    }
+
+    return rows;
+  }
+
+  private belongsToRow(row: SimplifiedLayer[], candidate: SimplifiedLayer): boolean {
+    const rowBounds = this.getBoundingBounds(row);
+    const rowCenterY = row.reduce((total, item) => total + item.bounds.y + item.bounds.height / 2, 0) / row.length;
+    const candidateCenterY = candidate.bounds.y + candidate.bounds.height / 2;
+    const minHeight = Math.min(
+      candidate.bounds.height,
+      ...row.map(item => item.bounds.height),
+    );
+    const centerTolerance = Math.max(12, minHeight * 0.7);
+    const overlap = Math.min(
+      rowBounds.y + rowBounds.height,
+      candidate.bounds.y + candidate.bounds.height,
+    ) - Math.max(rowBounds.y, candidate.bounds.y);
+
+    return overlap >= -4 && Math.abs(candidateCenterY - rowCenterY) <= centerTolerance;
   }
 
   private hasOwnVisual(node: SimplifiedLayer): boolean {

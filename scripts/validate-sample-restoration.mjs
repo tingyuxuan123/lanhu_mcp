@@ -50,6 +50,15 @@ function escapeHtml(value = '') {
     .replace(/'/g, '&#39;');
 }
 
+function layerAttrs(node) {
+  return [
+    `data-layer-id="${node.id}"`,
+    `data-layer-name="${escapeHtml(String(node.name || ''))}"`,
+    `data-layer-type="${escapeHtml(String(node.type || ''))}"`,
+    node.renderStrategy ? `data-render-strategy="${escapeHtml(String(node.renderStrategy))}"` : '',
+  ].filter(Boolean).join(' ');
+}
+
 function sortByPaint(nodes) {
   return [...nodes].sort((left, right) => (right.zIndex || 0) - (left.zIndex || 0));
 }
@@ -142,7 +151,7 @@ function boxStyles(node, {
   const styles = [
     'box-sizing:border-box',
     'transform-origin:top left',
-    'pointer-events:none',
+    'pointer-events:auto',
   ];
 
   if (mode === 'flow') {
@@ -399,11 +408,11 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
   }
 
   if (node.renderStrategy === 'asset' && node.assetUrl) {
-    return `<div class="layer asset" style="${boxStyles(node, { offsetX, offsetY, mode })}"><img src="${node.assetUrl}" style="width:100%;height:100%;display:block;object-fit:fill;" /></div>`;
+    return `<div class="layer asset" ${layerAttrs(node)} style="${boxStyles(node, { offsetX, offsetY, mode })}"><img src="${node.assetUrl}" style="width:100%;height:100%;display:block;object-fit:fill;pointer-events:none;" /></div>`;
   }
 
   if (node.text) {
-    return `<div class="layer text" style="${textContainerStyles(node, offsetX, offsetY, mode)}">${renderTextContent(node)}</div>`;
+    return `<div class="layer text" ${layerAttrs(node)} style="${textContainerStyles(node, offsetX, offsetY, mode)}">${renderTextContent(node)}</div>`;
   }
 
   if (node.renderStrategy === 'shape' && node.pathData?.components?.length) {
@@ -426,14 +435,14 @@ function renderOwn(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
     const stroke = node.stroke?.color || 'none';
     const strokeWidth = node.stroke?.width || 0;
 
-    return `<div class="layer shape" style="${wrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pathBounds.width} ${pathBounds.height}" style="${svgStyle}"><path d="${svgPathForNode(node)}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" fill-rule="evenodd" /></svg></div>`;
+    return `<div class="layer shape" ${layerAttrs(node)} style="${wrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pathBounds.width} ${pathBounds.height}" style="${svgStyle};pointer-events:none;"><path d="${svgPathForNode(node)}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" fill-rule="evenodd" /></svg></div>`;
   }
 
   if (!hasVisual(node)) {
     return '';
   }
 
-  return `<div class="layer ${node.type}" style="${boxStyles(node, { offsetX, offsetY, mode })}"></div>`;
+  return `<div class="layer ${node.type}" ${layerAttrs(node)} style="${boxStyles(node, { offsetX, offsetY, mode })}"></div>`;
 }
 
 function renderBitmapFallback(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
@@ -445,7 +454,7 @@ function renderBitmapFallback(node, offsetX = 0, offsetY = 0, mode = 'absolute')
       includeVisual: false,
     });
     const iconColor = '#8e9cb3';
-    return `<div class="layer bitmap-fallback avatar" style="${wrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style="width:100%;height:100%;display:block"><circle cx="24" cy="17" r="8" fill="${iconColor}" /><path d="M10 39c1.8-8.2 8.1-12.3 14-12.3S36.2 30.8 38 39" fill="${iconColor}" /></svg></div>`;
+    return `<div class="layer bitmap-fallback avatar" ${layerAttrs(node)} style="${wrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style="width:100%;height:100%;display:block;pointer-events:none;"><circle cx="24" cy="17" r="8" fill="${iconColor}" /><path d="M10 39c1.8-8.2 8.1-12.3 14-12.3S36.2 30.8 38 39" fill="${iconColor}" /></svg></div>`;
   }
 
   if (node.name === '我的') {
@@ -456,7 +465,7 @@ function renderBitmapFallback(node, offsetX = 0, offsetY = 0, mode = 'absolute')
       includeVisual: false,
     });
     const iconColor = '#c6c6c6';
-    return `<div class="layer bitmap-fallback profile" style="${wrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style="width:100%;height:100%;display:block"><circle cx="24" cy="18" r="8" fill="${iconColor}" /><path d="M11 39c1.7-7.7 7.7-11.5 13-11.5S35.3 31.3 37 39" fill="${iconColor}" /></svg></div>`;
+    return `<div class="layer bitmap-fallback profile" ${layerAttrs(node)} style="${wrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style="width:100%;height:100%;display:block;pointer-events:none;"><circle cx="24" cy="18" r="8" fill="${iconColor}" /><path d="M11 39c1.7-7.7 7.7-11.5 13-11.5S35.3 31.3 37 39" fill="${iconColor}" /></svg></div>`;
   }
 
   if (node.name === 'Path' && node.bounds.y <= 40 && node.bounds.width >= 600) {
@@ -479,7 +488,7 @@ function renderBitmapFallback(node, offsetX = 0, offsetY = 0, mode = 'absolute')
       'box-sizing:border-box',
     ].join(';');
 
-    return `<div class="layer bitmap-fallback status-bar" style="${wrapperStyle}">
+    return `<div class="layer bitmap-fallback status-bar" ${layerAttrs(node)} style="${wrapperStyle}">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:8px;letter-spacing:-1px">●●●●●</span>
         <span>${escapeHtml(statusAppLabel)}</span>
@@ -531,21 +540,23 @@ function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insi
   const childrenHtml = children.length > 0 && node.shouldRenderChildren !== false
     ? renderLayerList(children, node.bounds.x, node.bounds.y, 'absolute', insideMask)
     : '';
-  return `<div class="layer container" style="${wrapperStyle}">${childrenHtml}</div>`;
+  return `<div class="layer container" ${layerAttrs(node)} style="${wrapperStyle}">${childrenHtml}</div>`;
 }
 
-function flexLayoutStyles(node) {
+function flexLayoutStyles(node, mode = 'absolute') {
   const layout = node.layoutHint;
   if (!layout) {
     return '';
   }
 
+  const inlineFlow = mode === 'flow'
+    && (node.sizeHint?.width === 'content' || node.sizeHint?.height === 'content');
   const styles = [
-    'display:flex',
+    `display:${inlineFlow ? 'inline-flex' : 'flex'}`,
     `flex-direction:${layout.mode === 'flex-row' ? 'row' : 'column'}`,
-    `justify-content:${layout.justifyContent === 'space-between' ? 'space-between' : layout.justifyContent === 'center' ? 'center' : layout.justifyContent === 'end' ? 'flex-end' : 'flex-start'}`,
-    `align-items:${layout.alignItems === 'center' ? 'center' : layout.alignItems === 'end' ? 'flex-end' : layout.alignItems === 'stretch' ? 'stretch' : 'flex-start'}`,
-    `gap:${layout.gap || 0}px`,
+    `justify-content:${toFlexJustify(layout.justifyContent)}`,
+    `align-items:${toFlexAlign(layout.alignItems)}`,
+    `gap:${layout.lines?.length ? 0 : layout.gap || 0}px`,
     'box-sizing:border-box',
   ];
 
@@ -554,6 +565,71 @@ function flexLayoutStyles(node) {
   }
 
   return styles.join(';');
+}
+
+function toFlexJustify(value) {
+  return value === 'space-between'
+    ? 'space-between'
+    : value === 'center'
+      ? 'center'
+      : value === 'end'
+        ? 'flex-end'
+        : 'flex-start';
+}
+
+function toFlexAlign(value) {
+  return value === 'center'
+    ? 'center'
+    : value === 'end'
+      ? 'flex-end'
+      : value === 'stretch'
+        ? 'stretch'
+        : 'flex-start';
+}
+
+function renderLayoutLines(node) {
+  const layout = node.layoutHint;
+  const lines = layout?.lines || [];
+  const contentBounds = layout?.contentBounds || node.bounds;
+
+  return lines.map((line, index) => {
+    const items = (line.itemIds || []).map(id => nodesById.get(id)).filter(Boolean);
+    if (items.length === 0) {
+      return '';
+    }
+
+    const previousLine = index > 0 ? lines[index - 1] : null;
+    const marginTop = previousLine
+      ? line.bounds.y - (previousLine.bounds.y + previousLine.bounds.height)
+      : 0;
+    const marginLeft = line.bounds.x - contentBounds.x;
+    const styles = [
+      'position:relative',
+      'flex:0 0 auto',
+      items.length > 1 ? 'display:flex' : 'display:block',
+      items.length > 1 ? 'flex-direction:row' : '',
+      items.length > 1 ? `justify-content:${toFlexJustify(line.justifyContent)}` : '',
+      items.length > 1 ? `align-items:${toFlexAlign(line.alignItems)}` : '',
+      items.length > 1 ? `gap:${line.gap || 0}px` : '',
+      'box-sizing:border-box',
+    ];
+
+    if (Math.abs(marginTop) > 0.01) {
+      styles.push(`margin-top:${marginTop}px`);
+    }
+    if (Math.abs(marginLeft) > 0.01) {
+      styles.push(`margin-left:${marginLeft}px`);
+    }
+
+    if (items.length > 1) {
+      styles.push(`width:${contentBounds.width}px`);
+    } else if (!(items[0].sizeHint?.width === 'content')) {
+      styles.push(`width:${line.bounds.width}px`);
+    }
+
+    const lineHtml = items.map(child => renderFlowNode(child)).join('\n');
+    return `<div class="layout-line" style="${styles.filter(Boolean).join(';')}">${lineHtml}</div>`;
+  }).join('\n');
 }
 
 function renderFlowNode(node) {
@@ -588,15 +664,17 @@ function renderFlexNode(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
       visualNode: visualNode || node,
     }),
     visualNode ? shapeClipStyles(visualNode, node.bounds) : '',
-    flexLayoutStyles(node),
+    flexLayoutStyles(node, mode),
   ].join(';');
   const overlayHtml = overlays
     .filter(child => child.id !== visualNode?.id)
     .map(child => renderNode(child, node.bounds.x, node.bounds.y, 'absolute', false))
     .join('\n');
-  const flowHtml = items.map(child => renderFlowNode(child)).join('\n');
+  const flowHtml = node.layoutHint?.lines?.length
+    ? renderLayoutLines(node)
+    : items.map(child => renderFlowNode(child)).join('\n');
 
-  return `<div class="layer flex-node" style="${wrapperStyle}">${overlayHtml}${flowHtml}</div>`;
+  return `<div class="layer flex-node" ${layerAttrs(node)} style="${wrapperStyle}">${overlayHtml}${flowHtml}</div>`;
 }
 
 function renderMaskGroup(maskNode, offsetX = 0, offsetY = 0, mode = 'absolute') {
@@ -616,7 +694,7 @@ function renderMaskGroup(maskNode, offsetX = 0, offsetY = 0, mode = 'absolute') 
   ].join(';');
   const childrenHtml = sortByPaint(targets).map(target => renderNode(target, maskNode.bounds.x, maskNode.bounds.y, 'absolute', true)).join('\n');
 
-  return `${ownMask}<div class="layer mask" style="${wrapperStyles}">${childrenHtml}</div>`;
+  return `${ownMask}<div class="layer mask" ${layerAttrs(maskNode)} style="${wrapperStyles}">${childrenHtml}</div>`;
 }
 
 function renderNode(node, offsetX = 0, offsetY = 0, mode = 'absolute', insideMask = false) {
@@ -660,7 +738,8 @@ const html = `<!DOCTYPE html>
     body { width: ${artboard.width}px; height: ${artboard.height}px; overflow: hidden; }
     #artboard { position: relative; width: ${artboard.width}px; height: ${artboard.height}px; overflow: hidden; background: #fff; }
     .layer { position: absolute; }
-    .text { -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+    .text { -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; user-select: text; }
+    #artboard img, #artboard svg, #artboard path { pointer-events: none; }
   </style>
 </head>
 <body>

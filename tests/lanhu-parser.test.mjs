@@ -126,3 +126,17 @@ test('parser normalizes sample gradient angles and border radii for restoration'
 
   assert.deepEqual(primaryCardBackground?.borderRadius, [0, 24, 24, 24]);
 });
+
+test('parser infers stacked row layouts for recommendation cards', async () => {
+  const { layers, restoration } = await loadSampleLayers();
+  const all = flatten(layers);
+  const recommendationCard = all.find(node => node.id === 30449);
+  const stackedLines = recommendationCard?.layoutHint?.lines || [];
+
+  assert.equal(recommendationCard?.layoutHint?.mode, 'flex-column');
+  assert.ok(stackedLines.length >= 5, 'expected recommendation card to be split into stacked rows');
+  assert.deepEqual(stackedLines[0]?.itemIds, [30440, 30496]);
+  assert.ok(stackedLines[1]?.itemIds.includes(30438));
+  assert.ok(stackedLines.at(-1)?.itemIds.includes(30447));
+  assert.ok(restoration.flexContainerIds.includes(30449));
+});

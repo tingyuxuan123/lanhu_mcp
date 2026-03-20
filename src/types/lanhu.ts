@@ -450,6 +450,13 @@ export interface SimplifiedLayoutHint {
   justifyContent?: 'start' | 'center' | 'end' | 'space-between';
   alignItems?: 'start' | 'center' | 'end' | 'stretch';
   contentBounds?: SimplifiedBounds;
+  lines?: Array<{
+    itemIds: number[];
+    bounds: SimplifiedBounds;
+    gap?: number;
+    justifyContent?: 'start' | 'center' | 'end' | 'space-between';
+    alignItems?: 'start' | 'center' | 'end' | 'stretch';
+  }>;
 }
 
 export interface SimplifiedSizeHint {

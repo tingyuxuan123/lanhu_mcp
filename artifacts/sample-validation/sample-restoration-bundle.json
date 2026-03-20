@@ -335,11 +335,14 @@
     "flexContainerIds": [
       24609,
       24597,
+      24580,
+      30546,
       30537,
       30523,
       30516,
       30510,
       30508,
+      30449,
       30430,
       30495,
       30488,
@@ -358,6 +361,7 @@
       30093,
       30091,
       30082,
+      30079,
       24228,
       24227,
       24207,
@@ -4281,6 +4285,69 @@
                   "sizeHint": {
                     "width": "fixed",
                     "height": "fixed"
+                  },
+                  "layoutHint": {
+                    "mode": "flex-column",
+                    "itemIds": [
+                      24577,
+                      24578,
+                      24579
+                    ],
+                    "overlayIds": [
+                      24576
+                    ],
+                    "gap": 0,
+                    "padding": {
+                      "left": 6.28,
+                      "top": 4,
+                      "right": 6.25,
+                      "bottom": 11
+                    },
+                    "justifyContent": "start",
+                    "alignItems": "stretch",
+                    "contentBounds": {
+                      "x": 216,
+                      "y": 1448,
+                      "width": 36,
+                      "height": 27,
+                      "absoluteX": 2794,
+                      "absoluteY": 1470
+                    },
+                    "lines": [
+                      {
+                        "itemIds": [
+                          24577
+                        ],
+                        "bounds": {
+                          "x": 219.9699999999998,
+                          "y": 1448,
+                          "width": 27.7800000000002,
+                          "height": 11,
+                          "absoluteX": 2769.97,
+                          "absoluteY": 1448
+                        },
+                        "gap": 0,
+                        "justifyContent": "start",
+                        "alignItems": "start"
+                      },
+                      {
+                        "itemIds": [
+                          24578,
+                          24579
+                        ],
+                        "bounds": {
+                          "x": 216,
+                          "y": 1470,
+                          "width": 36,
+                          "height": 5,
+                          "absoluteX": 2766,
+                          "absoluteY": 1470
+                        },
+                        "gap": 20,
+                        "justifyContent": "space-between",
+                        "alignItems": "center"
+                      }
+                    ]
                   }
                 },
                 {
@@ -9425,6 +9492,141 @@
                 "width": "fixed",
                 "height": "fixed"
               },
+              "layoutHint": {
+                "mode": "flex-column",
+                "itemIds": [
+                  30524,
+                  30525,
+                  30510,
+                  30545,
+                  30516,
+                  30523,
+                  30526,
+                  30537,
+                  30541
+                ],
+                "overlayIds": [
+                  30502
+                ],
+                "gap": 0,
+                "padding": {
+                  "left": 31,
+                  "top": 21,
+                  "right": 31,
+                  "bottom": 24
+                },
+                "justifyContent": "start",
+                "alignItems": "stretch",
+                "contentBounds": {
+                  "x": 56,
+                  "y": 1246,
+                  "width": 638,
+                  "height": 288,
+                  "absoluteX": 2855,
+                  "absoluteY": 1280
+                },
+                "lines": [
+                  {
+                    "itemIds": [
+                      30524,
+                      30525
+                    ],
+                    "bounds": {
+                      "x": 58,
+                      "y": 1246,
+                      "width": 634,
+                      "height": 22,
+                      "absoluteX": 2608,
+                      "absoluteY": 1248
+                    },
+                    "gap": 301,
+                    "justifyContent": "space-between",
+                    "alignItems": "center"
+                  },
+                  {
+                    "itemIds": [
+                      30510,
+                      30545
+                    ],
+                    "bounds": {
+                      "x": 57,
+                      "y": 1280,
+                      "width": 345,
+                      "height": 40,
+                      "absoluteX": 2607,
+                      "absoluteY": 1285
+                    },
+                    "gap": 40,
+                    "justifyContent": "start",
+                    "alignItems": "center"
+                  },
+                  {
+                    "itemIds": [
+                      30516
+                    ],
+                    "bounds": {
+                      "x": 57,
+                      "y": 1339,
+                      "width": 241,
+                      "height": 26,
+                      "absoluteX": 2607,
+                      "absoluteY": 1339
+                    },
+                    "gap": 0,
+                    "justifyContent": "start",
+                    "alignItems": "start"
+                  },
+                  {
+                    "itemIds": [
+                      30523
+                    ],
+                    "bounds": {
+                      "x": 57,
+                      "y": 1397,
+                      "width": 286,
+                      "height": 26,
+                      "absoluteX": 2607,
+                      "absoluteY": 1397
+                    },
+                    "gap": 0,
+                    "justifyContent": "start",
+                    "alignItems": "start"
+                  },
+                  {
+                    "itemIds": [
+                      30526
+                    ],
+                    "bounds": {
+                      "x": 56,
+                      "y": 1455,
+                      "width": 638,
+                      "height": 1,
+                      "absoluteX": 2606,
+                      "absoluteY": 1455
+                    },
+                    "gap": 0,
+                    "justifyContent": "start",
+                    "alignItems": "start"
+                  },
+                  {
+                    "itemIds": [
+                      30537,
+                      30541
+                    ],
+                    "bounds": {
+                      "x": 57,
+                      "y": 1480,
+                      "width": 636,
+                      "height": 54,
+                      "absoluteX": 2607,
+                      "absoluteY": 1483
+                    },
+                    "gap": 283,
+                    "justifyContent": "space-between",
+                    "alignItems": "center"
+                  }
+                ]
+              },
               "containerVisualSourceId": 30502
             },
             {
@@ -13496,6 +13698,141 @@
               "sizeHint": {
                 "width": "fixed",
                 "height": "fixed"
+              },
+              "layoutHint": {
+                "mode": "flex-column",
+                "itemIds": [
+                  30440,
+                  30496,
+                  30438,
+                  30500,
+                  30488,
+                  30495,
+                  30448,
+                  30430,
+                  30447
+                ],
+                "overlayIds": [
+                  30419
+                ],
+                "gap": 0,
+                "padding": {
+                  "left": 31,
+                  "top": 21,
+                  "right": 31,
+                  "bottom": 24
+                },
+                "justifyContent": "start",
+                "alignItems": "stretch",
+                "contentBounds": {
+                  "x": 56,
+                  "y": 913,
+                  "width": 638,
+                  "height": 288,
+                  "absoluteX": 2855,
+                  "absoluteY": 947
+                },
+                "lines": [
+                  {
+                    "itemIds": [
+                      30440,
+                      30496
+                    ],
+                    "bounds": {
+                      "x": 58,
+                      "y": 913,
+                      "width": 634,
+                      "height": 22,
+                      "absoluteX": 2608,
+                      "absoluteY": 915
+                    },
+                    "gap": 301,
+                    "justifyContent": "space-between",
+                    "alignItems": "center"
+                  },
+                  {
+                    "itemIds": [
+                      30438,
+                      30500
+                    ],
+                    "bounds": {
+                      "x": 57,
+                      "y": 947,
+                      "width": 345,
+                      "height": 40,
+                      "absoluteX": 2607,
+                      "absoluteY": 952
+                    },
+                    "gap": 40,
+                    "justifyContent": "start",
+                    "alignItems": "center"
+                  },
+                  {
+                    "itemIds": [
+                      30488
+                    ],
+                    "bounds": {
+                      "x": 57,
+                      "y": 1006,
+                      "width": 241,
+                      "height": 26,
+                      "absoluteX": 2607,
+                      "absoluteY": 1006
+                    },
+                    "gap": 0,
+                    "justifyContent": "start",
+                    "alignItems": "start"
+                  },
+                  {
+                    "itemIds": [
+                      30495
+                    ],
+                    "bounds": {
+                      "x": 57,
+                      "y": 1064,
+                      "width": 286,
+                      "height": 26,
+                      "absoluteX": 2607,
+                      "absoluteY": 1064
+                    },
+                    "gap": 0,
+                    "justifyContent": "start",
+                    "alignItems": "start"
+                  },
+                  {
+                    "itemIds": [
+                      30448
+                    ],
+                    "bounds": {
+                      "x": 56,
+                      "y": 1122,
+                      "width": 638,
+                      "height": 1,
+                      "absoluteX": 2606,
+                      "absoluteY": 1122
+                    },
+                    "gap": 0,
+                    "justifyContent": "start",
+                    "alignItems": "start"
+                  },
+                  {
+                    "itemIds": [
+                      30430,
+                      30447
+                    ],
+                    "bounds": {
+                      "x": 57,
+                      "y": 1147,
+                      "width": 636,
+                      "height": 54,
+                      "absoluteX": 2607,
+                      "absoluteY": 1150
+                    },
+                    "gap": 283,
+                    "justifyContent": "space-between",
+                    "alignItems": "center"
+                  }
+                ]
               },
               "containerVisualSourceId": 30419
             },
@@ -27594,6 +27931,70 @@
                           "sizeHint": {
                             "width": "fixed",
                             "height": "fixed"
+                          },
+                          "layoutHint": {
+                            "mode": "flex-column",
+                            "itemIds": [
+                              30076,
+                              30077,
+                              30078
+                            ],
+                            "overlayIds": [
+                              30075,
+                              30074
+                            ],
+                            "gap": 0,
+                            "padding": {
+                              "left": 8,
+                              "top": 12,
+                              "right": 8,
+                              "bottom": 15
+                            },
+                            "justifyContent": "start",
+                            "alignItems": "stretch",
+                            "contentBounds": {
+                              "x": 88,
+                              "y": 306,
+                              "width": 48,
+                              "height": 27,
+                              "absoluteX": 2638,
+                              "absoluteY": 327
+                            },
+                            "lines": [
+                              {
+                                "itemIds": [
+                                  30076,
+                                  30077
+                                ],
+                                "bounds": {
+                                  "x": 88,
+                                  "y": 306,
+                                  "width": 48,
+                                  "height": 14,
+                                  "absoluteX": 2638,
+                                  "absoluteY": 306
+                                },
+                                "gap": 4,
+                                "justifyContent": "space-between",
+                                "alignItems": "center"
+                              },
+                              {
+                                "itemIds": [
+                                  30078
+                                ],
+                                "bounds": {
+                                  "x": 88,
+                                  "y": 327,
+                                  "width": 48,
+                                  "height": 6,
+                                  "absoluteX": 2638,
+                                  "absoluteY": 327
+                                },
+                                "gap": 0,
+                                "justifyContent": "start",
+                                "alignItems": "start"
+                              }
+                            ]
                           }
                         },
                         {
