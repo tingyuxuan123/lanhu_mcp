@@ -1,18 +1,82 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { LanhuClient } from '../dist/services/lanhu-client.js';
 import { LanhuParser } from '../dist/services/lanhu-parser.js';
 import { imageCompareService } from '../dist/services/image-compare.js';
+import { parseLanhuUrl } from '../dist/utils/url-parser.js';
 
-const jsonPath = path.resolve(process.env.SAMPLE_JSON_PATH || 'tmp_sample.json');
-const referenceImagePath = path.resolve(process.env.SAMPLE_REFERENCE_PATH || 'tmp_sample.png');
-const outputDir = path.resolve(process.env.SAMPLE_OUTPUT_DIR || 'artifacts/sample-validation');
+const pageUrl = process.env.LANHU_PAGE_URL;
+const cookie = process.env.LANHU_COOKIE || '';
+const directJsonUrl = process.env.LANHU_JSON_URL;
+const directReferenceImageUrl = process.env.LANHU_REFERENCE_IMAGE_URL || null;
+const jsonPath = pageUrl || directJsonUrl ? null : path.resolve(process.env.SAMPLE_JSON_PATH || 'tmp_sample.json');
+const referenceImagePath = pageUrl || directReferenceImageUrl ? null : path.resolve(process.env.SAMPLE_REFERENCE_PATH || 'tmp_sample.png');
+const outputDir = path.resolve(
+  process.env.LANHU_OUTPUT_DIR
+  || process.env.SAMPLE_OUTPUT_DIR
+  || (pageUrl || directJsonUrl ? 'artifacts/lanhu-restoration' : 'artifacts/sample-validation'),
+);
+const outputPrefix = process.env.RESTORATION_OUTPUT_PREFIX || (pageUrl || directJsonUrl ? 'lanhu-restoration' : 'sample-restoration');
 const statusTimeLabel = process.env.SAMPLE_STATUS_TIME || '1:21 AM';
 const statusAppLabel = process.env.SAMPLE_STATUS_APP || 'WeChat';
 
 await fs.mkdir(outputDir, { recursive: true });
 
-const document = JSON.parse(await fs.readFile(jsonPath, 'utf8'));
+if (pageUrl && !cookie) {
+  throw new Error('LANHU_COOKIE is required when LANHU_PAGE_URL is provided');
+}
+
+let document;
+let sourceMeta;
+let referenceImageUrl = directReferenceImageUrl;
+
+if (pageUrl) {
+  const client = new LanhuClient(cookie);
+  const imageInfo = await client.getImageInfo(parseLanhuUrl(pageUrl));
+  const latestVersion = client.getLatestVersion(imageInfo);
+  document = await client.fetchSketchJson(latestVersion.json_url);
+  referenceImageUrl = referenceImageUrl || imageInfo.url || latestVersion.url;
+  sourceMeta = {
+    mode: 'page_url',
+    pageUrl,
+    imageId: imageInfo.id,
+    designName: imageInfo.name,
+    latestVersionId: latestVersion.id,
+    latestVersionInfo: latestVersion.version_info,
+    jsonUrl: latestVersion.json_url,
+    imageUrl: latestVersion.url,
+    referenceImageUrl,
+  };
+} else if (directJsonUrl) {
+  const response = await fetch(directJsonUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      Accept: 'application/json, text/plain, */*',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Lanhu JSON: ${response.status} ${response.statusText}`);
+  }
+
+  document = await response.json();
+  sourceMeta = {
+    mode: 'json_url',
+    jsonUrl: directJsonUrl,
+    imageUrl: referenceImageUrl,
+    referenceImageUrl,
+  };
+} else {
+  document = JSON.parse(await fs.readFile(jsonPath, 'utf8'));
+  sourceMeta = {
+    mode: 'local_sample',
+    jsonPath,
+    imagePath: referenceImagePath,
+    referenceImagePath,
+  };
+}
+
 const parser = new LanhuParser();
 const parsed = parser.parseDocument(document);
 const artboard = parser.getArtboardInfo(parsed);
@@ -22,11 +86,11 @@ const layers = parser.buildLayerTree(parsed, 30, {
 });
 const restoration = parser.buildRestorationPlan(layers);
 
-const htmlPath = path.join(outputDir, 'sample-restoration.html');
-const screenshotPath = path.join(outputDir, 'sample-restoration.png');
-const diffPath = path.join(outputDir, 'sample-restoration-diff.png');
-const metaPath = path.join(outputDir, 'sample-restoration-meta.json');
-const parsedPath = path.join(outputDir, 'sample-restoration-bundle.json');
+const htmlPath = path.join(outputDir, `${outputPrefix}.html`);
+const screenshotPath = path.join(outputDir, `${outputPrefix}.png`);
+const diffPath = path.join(outputDir, `${outputPrefix}-diff.png`);
+const metaPath = path.join(outputDir, `${outputPrefix}-meta.json`);
+const parsedPath = path.join(outputDir, `${outputPrefix}-bundle.json`);
 
 const nodesById = new Map();
 const walk = nodes => {
@@ -1232,17 +1296,32 @@ await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'network
 await page.locator('#artboard').screenshot({ path: screenshotPath });
 await browser.close();
 
-const compare = await imageCompareService.compare({
-  referenceImagePath,
-  candidateImagePath: screenshotPath,
-  diffOutputPath: diffPath,
-  resizeCandidate: true,
-  mismatchThreshold: 0.08,
-  gridRows: 8,
-  gridCols: 4,
-});
+let compare = null;
+if (referenceImageUrl || referenceImagePath) {
+  const compareParams = {
+    candidateImagePath: screenshotPath,
+    diffOutputPath: diffPath,
+    resizeCandidate: true,
+    mismatchThreshold: 0.08,
+    gridRows: 8,
+    gridCols: 4,
+  };
+
+  if (referenceImageUrl) {
+    compare = await imageCompareService.compare({
+      ...compareParams,
+      referenceImageUrl,
+    });
+  } else {
+    compare = await imageCompareService.compare({
+      ...compareParams,
+      referenceImagePath,
+    });
+  }
+}
 
 const result = {
+  source: sourceMeta,
   artboard,
   rootLayerCount: layers.length,
   restoration,

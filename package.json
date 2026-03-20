@@ -13,6 +13,7 @@
     "dev": "tsc --watch",
     "restore:loop": "node scripts/run-lanhu-loop.mjs",
     "validate:sample": "npm run build && node scripts/validate-sample-restoration.mjs",
+    "render:lanhu": "npm run build && node scripts/validate-sample-restoration.mjs",
     "test": "npm run build && node --test tests/*.test.mjs"
   },
   "keywords": [

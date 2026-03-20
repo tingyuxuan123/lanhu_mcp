@@ -5,7 +5,7 @@
 import { ApiError, AuthenticationError, ParseError } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
 import { buildApiUrl, ParsedLanhuUrl } from '../utils/url-parser.js';
-import type { ImageResult, ImageVersion, LanhuApiResponse, LanhuDocument } from '../types/index.js';
+import type { ImageResult, ImageVersion, LanhuApiResponse, LanhuDocument, UserSettingsResult } from '../types/index.js';
 import { getLatestVersion } from '../types/api.js';
 
 export class LanhuClient {
@@ -72,7 +72,13 @@ export class LanhuClient {
   }
 
   async getImageInfo(params: ParsedLanhuUrl): Promise<ImageResult> {
-    const url = buildApiUrl(params);
+    const resolvedParams = params.teamId
+      ? params
+      : {
+          ...params,
+          teamId: await this.getCurrentTeamId(),
+        };
+    const url = buildApiUrl(resolvedParams);
     const response = await this.request<LanhuApiResponse<ImageResult>>(url);
 
     if (response.code !== '00000') {
@@ -84,6 +90,36 @@ export class LanhuClient {
 
     logger.info(`Fetched design info: ${response.result.name}`);
     return response.result;
+  }
+
+  async getCurrentTeamId(): Promise<string> {
+    const response = await this.request<LanhuApiResponse<string>>(
+      `${this.baseUrl}/api/account/user_settings?settings_type=web_main`,
+    );
+
+    if (response.code !== '00000') {
+      if (response.code === '40001' || response.code === '40003') {
+        throw new AuthenticationError(response.msg || 'Cookie authentication failed');
+      }
+      throw new ApiError(`Failed to fetch Lanhu user settings: ${response.msg || response.code}`, 0);
+    }
+
+    let settings: UserSettingsResult;
+    try {
+      settings = typeof response.result === 'string'
+        ? JSON.parse(response.result) as UserSettingsResult
+        : response.result as unknown as UserSettingsResult;
+    } catch (error) {
+      throw new ParseError(`Failed to parse user settings JSON: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    const teamId = settings.teamStatus?.team_id;
+    if (!teamId) {
+      throw new ApiError('Lanhu user settings missing teamStatus.team_id', 0);
+    }
+
+    logger.debug(`Resolved team ID from user settings: ${teamId}`);
+    return teamId;
   }
 
   getLatestVersion(result: ImageResult): ImageVersion {

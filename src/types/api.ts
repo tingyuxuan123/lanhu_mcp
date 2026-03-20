@@ -8,6 +8,13 @@ export interface LanhuApiResponse<T> {
   result: T;
 }
 
+export interface UserSettingsResult {
+  teamStatus?: {
+    team_id?: string;
+  };
+  [key: string]: unknown;
+}
+
 export interface ImageVersion {
   id: string;
   type: 'image';
