@@ -24,14 +24,40 @@ export class StyleExtractor {
   private lanhuNodeToCSS(node: SimplifiedLayer): string {
     const className = this.toClassName(node.name);
     const lines: string[] = [];
+    const isContentWidth = node.sizeHint?.width === 'content';
+    const isContentHeight = node.sizeHint?.height === 'content';
+    const isFlex = node.layoutHint && node.layoutHint.mode !== 'absolute';
 
     lines.push(`/* ${node.name} (${node.type}) */`);
     lines.push(`.${className} {`);
-    lines.push('  position: absolute;');
-    lines.push(`  left: ${node.bounds.x}px;`);
-    lines.push(`  top: ${node.bounds.y}px;`);
-    lines.push(`  width: ${node.bounds.width}px;`);
-    lines.push(`  height: ${node.bounds.height}px;`);
+    lines.push('  box-sizing: border-box;');
+
+    if (isFlex) {
+      lines.push('  display: flex;');
+      lines.push(`  flex-direction: ${node.layoutHint?.mode === 'flex-row' ? 'row' : 'column'};`);
+      if (node.layoutHint?.gap !== undefined) {
+        lines.push(`  gap: ${node.layoutHint.gap}px;`);
+      }
+      if (node.layoutHint?.justifyContent) {
+        lines.push(`  justify-content: ${this.toCssFlexValue(node.layoutHint.justifyContent)};`);
+      }
+      if (node.layoutHint?.alignItems) {
+        lines.push(`  align-items: ${this.toCssFlexValue(node.layoutHint.alignItems)};`);
+      }
+      if (node.layoutHint?.padding) {
+        lines.push(`  padding: ${node.layoutHint.padding.top}px ${node.layoutHint.padding.right}px ${node.layoutHint.padding.bottom}px ${node.layoutHint.padding.left}px;`);
+      }
+    } else {
+      lines.push('  position: absolute;');
+      lines.push(`  left: ${node.bounds.x}px;`);
+      lines.push(`  top: ${node.bounds.y}px;`);
+    }
+    if (!isContentWidth) {
+      lines.push(`  width: ${node.bounds.width}px;`);
+    }
+    if (!isContentHeight) {
+      lines.push(`  height: ${node.bounds.height}px;`);
+    }
 
     if (node.opacity !== undefined) {
       lines.push(`  opacity: ${node.opacity};`);
@@ -70,6 +96,7 @@ export class StyleExtractor {
 
     if (node.textStyle) {
       const style = node.textStyle;
+      lines.push('  display: inline-block;');
       lines.push(`  font-size: ${style.fontSize}px;`);
       lines.push(`  font-family: '${style.fontFamily}';`);
       lines.push(`  font-weight: ${style.fontWeight || 400};`);
@@ -89,13 +116,24 @@ export class StyleExtractor {
   }
 
   private lanhuNodeToTailwind(node: SimplifiedLayer): string {
-    const classes: string[] = [
-      'absolute',
-      `left-[${node.bounds.x}px]`,
-      `top-[${node.bounds.y}px]`,
-      `w-[${node.bounds.width}px]`,
-      `h-[${node.bounds.height}px]`,
-    ];
+    const classes: string[] = ['box-border'];
+    if (node.layoutHint && node.layoutHint.mode !== 'absolute') {
+      classes.push('flex');
+      classes.push(node.layoutHint.mode === 'flex-row' ? 'flex-row' : 'flex-col');
+      if (node.layoutHint.gap !== undefined) classes.push(`gap-[${node.layoutHint.gap}px]`);
+      if (node.layoutHint.padding) {
+        classes.push(`pt-[${node.layoutHint.padding.top}px]`);
+        classes.push(`pr-[${node.layoutHint.padding.right}px]`);
+        classes.push(`pb-[${node.layoutHint.padding.bottom}px]`);
+        classes.push(`pl-[${node.layoutHint.padding.left}px]`);
+      }
+    } else {
+      classes.push('absolute');
+      classes.push(`left-[${node.bounds.x}px]`);
+      classes.push(`top-[${node.bounds.y}px]`);
+    }
+    if (node.sizeHint?.width !== 'content') classes.push(`w-[${node.bounds.width}px]`);
+    if (node.sizeHint?.height !== 'content') classes.push(`h-[${node.bounds.height}px]`);
 
     if (node.fill && !node.fill.startsWith('linear-gradient') && !node.fill.startsWith('radial-gradient')) {
       classes.push(`bg-[${node.fill}]`);
@@ -112,6 +150,7 @@ export class StyleExtractor {
 
     if (node.textStyle) {
       const style = node.textStyle;
+      classes.push('inline-block');
       classes.push(`text-[${style.fontSize}px]`);
       classes.push(`text-[${style.color}]`);
       if (style.alignment === 'center') classes.push('text-center');
@@ -133,12 +172,25 @@ export class StyleExtractor {
 
   private toInlineStyle(node: SimplifiedLayer): string {
     const style: Record<string, string | number> = {
-      position: 'absolute',
-      left: `${node.bounds.x}px`,
-      top: `${node.bounds.y}px`,
-      width: `${node.bounds.width}px`,
-      height: `${node.bounds.height}px`,
+      boxSizing: 'border-box',
     };
+
+    if (node.layoutHint && node.layoutHint.mode !== 'absolute') {
+      style.display = 'flex';
+      style.flexDirection = node.layoutHint.mode === 'flex-row' ? 'row' : 'column';
+      if (node.layoutHint.gap !== undefined) style.gap = `${node.layoutHint.gap}px`;
+      if (node.layoutHint.justifyContent) style.justifyContent = this.toCssFlexValue(node.layoutHint.justifyContent);
+      if (node.layoutHint.alignItems) style.alignItems = this.toCssFlexValue(node.layoutHint.alignItems);
+      if (node.layoutHint.padding) {
+        style.padding = `${node.layoutHint.padding.top}px ${node.layoutHint.padding.right}px ${node.layoutHint.padding.bottom}px ${node.layoutHint.padding.left}px`;
+      }
+    } else {
+      style.position = 'absolute';
+      style.left = `${node.bounds.x}px`;
+      style.top = `${node.bounds.y}px`;
+    }
+    if (node.sizeHint?.width !== 'content') style.width = `${node.bounds.width}px`;
+    if (node.sizeHint?.height !== 'content') style.height = `${node.bounds.height}px`;
 
     if (node.opacity !== undefined) style.opacity = node.opacity;
     if (node.assetUrl) {
@@ -156,6 +208,7 @@ export class StyleExtractor {
     if (node.stroke) style.border = `${node.stroke.width}px solid ${node.stroke.color}`;
     if (typeof node.borderRadius === 'number') style.borderRadius = `${node.borderRadius}px`;
     if (node.textStyle) {
+      style.display = 'inline-block';
       style.fontSize = `${node.textStyle.fontSize}px`;
       style.fontFamily = node.textStyle.fontFamily;
       style.fontWeight = node.textStyle.fontWeight || 400;
@@ -184,6 +237,12 @@ export class StyleExtractor {
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join('')
       .substring(0, 50) || 'Layer';
+  }
+
+  private toCssFlexValue(value: 'start' | 'center' | 'end' | 'space-between' | 'stretch'): string {
+    if (value === 'start') return 'flex-start';
+    if (value === 'end') return 'flex-end';
+    return value;
   }
 
   extractBatchFromLanhu(layers: SimplifiedLayer[], format: OutputFormat = 'css'): string {

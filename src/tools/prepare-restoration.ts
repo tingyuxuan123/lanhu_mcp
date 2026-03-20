@@ -41,6 +41,7 @@ export function registerPrepareRestorationTool(server: McpServer): void {
           includeInvisible: params.include_invisible ?? false,
           normalizeToArtboard: true,
         });
+        const restoration = parser.buildRestorationPlan(layers);
         const textLayers = parser.extractTextLayers(document, {
           includeInvisible: params.include_invisible ?? false,
           normalizeToArtboard: true,
@@ -79,14 +80,16 @@ export function registerPrepareRestorationTool(server: McpServer): void {
                       designToReferenceY: Number(scaleY.toFixed(4)),
                     },
                     layers,
+                    restoration,
                     textLayers,
                     assets,
                     tokens,
                     renderHints: [
                       '先按 artboard.width / artboard.height 还原布局，再按 designToReferenceX / Y 缩放到蓝湖页面展示尺寸。',
                       '优先使用 latestVersion.imageUrl 作为最终对比图。',
-                      '坐标已归一到画板左上角，absoluteX / absoluteY 保留原始设计坐标。',
-                      'assetUrl 可直接作为图标/位图资源来源，shapeType / borderRadius / shadows 可用于高保真还原。',
+                      '坐标已归一到画板左上角，absoluteX / absoluteY 保留原始设计坐标；boundsMetadata 额外提供 frame / visual / original。',
+                      'restoration.paintOrder / maskGroups / clippedLayerIds 可直接指导页面从背景到前景的还原顺序。',
+                      'assetUrl 可直接作为图标/位图资源来源，shapeType / borderRadius / textStyleRanges / textMetrics / shadows 可用于高保真还原。',
                     ],
                   },
                 },

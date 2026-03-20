@@ -54,10 +54,47 @@ export interface LanhuTextInfo {
   justification?: 'left' | 'center' | 'right';
   leading?: number | null;
   tracking?: number | null;
+  baselineShift?: number | null;
+  horizontalScale?: number | null;
+  verticalScale?: number | null;
   fontName?: string;
   fontStyleName?: string;
+  antiAlias?: string;
+  _orgTransform?: {
+    xx: number;
+    xy: number;
+    yx: number;
+    yy: number;
+    tx: number;
+    ty: number;
+  };
   textStyleRange?: LanhuTextStyleRange[];
   bounds?: LanhuBounds;
+  boundingBox?: LanhuBounds;
+  textShape?: Array<{
+    char?: string;
+    orientation?: string;
+    transform?: {
+      xx: number;
+      xy: number;
+      yx: number;
+      yy: number;
+      tx: number;
+      ty: number;
+    };
+    rowCount?: number;
+    columnCount?: number;
+    rowMajorOrder?: boolean;
+    rowGutter?: number;
+    columnGutter?: number;
+    spacing?: number;
+    frameBaselineAlignment?: string;
+    firstBaselineMinimum?: number;
+    base?: {
+      horizontal?: number;
+      vertical?: number;
+    };
+  }>;
 }
 
 export interface LanhuGradientStop {
@@ -250,6 +287,15 @@ export interface SimplifiedBounds {
   absoluteY?: number;
 }
 
+export interface SimplifiedRelativeRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
 export interface SimplifiedTextStyle {
   fontSize: number;
   fontFamily: string;
@@ -299,6 +345,118 @@ export interface SimplifiedShadow {
   blendMode?: string;
 }
 
+export interface SimplifiedTextStyleRange {
+  from: number;
+  to: number;
+  fontSize?: number;
+  fontFamily?: string;
+  fontWeight?: number;
+  fontStyle?: 'normal' | 'italic';
+  color?: string;
+}
+
+export interface SimplifiedTextMetrics {
+  relativeBounds?: SimplifiedRelativeRect;
+  relativeBoundingBox?: SimplifiedRelativeRect;
+  antiAlias?: string;
+  frameBaselineAlignment?: string;
+  baselineShift?: number;
+  horizontalScale?: number;
+  verticalScale?: number;
+  transformScaleX?: number;
+  transformScaleY?: number;
+}
+
+export interface SimplifiedClipMetadata {
+  clipped: boolean;
+  isMask: boolean;
+  maskId?: number;
+  targetIds?: number[];
+  beforeClipBounds?: SimplifiedBounds;
+}
+
+export interface SimplifiedAdjustment {
+  type?: string;
+  presetKind?: string;
+  clipped?: boolean;
+  curves?: Array<{
+    channel?: string;
+    points: Array<{
+      x: number;
+      y: number;
+    }>;
+  }>;
+}
+
+export interface SimplifiedPathSummary {
+  componentCount: number;
+  pointCount: number;
+  originType?: string;
+  pathBounds?: SimplifiedBounds;
+  hasComplexGeometry: boolean;
+}
+
+export interface SimplifiedPathPointHandle {
+  x: number;
+  y: number;
+}
+
+export interface SimplifiedPathPointData {
+  anchor: SimplifiedPathPointHandle;
+  forward: SimplifiedPathPointHandle;
+  backward: SimplifiedPathPointHandle;
+  smooth?: boolean;
+}
+
+export interface SimplifiedPathSubpathData {
+  closed: boolean;
+  points: SimplifiedPathPointData[];
+}
+
+export interface SimplifiedPathComponentData {
+  operation?: string;
+  originType?: string;
+  originBounds?: SimplifiedBounds;
+  radii?: number[];
+  subpaths: SimplifiedPathSubpathData[];
+}
+
+export interface SimplifiedPathGeometry extends SimplifiedPathSummary {
+  components: SimplifiedPathComponentData[];
+}
+
+export interface SimplifiedBoundsMetadata {
+  frame: SimplifiedBounds;
+  visual?: SimplifiedBounds;
+  original?: SimplifiedBounds;
+  path?: SimplifiedBounds;
+}
+
+export type SimplifiedRenderStrategy = 'asset' | 'text' | 'shape' | 'group' | 'adjustment' | 'layer';
+
+export interface SimplifiedSpacing {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export interface SimplifiedLayoutHint {
+  mode: 'absolute' | 'flex-row' | 'flex-column';
+  itemIds: number[];
+  overlayIds: number[];
+  gap?: number;
+  padding?: SimplifiedSpacing;
+  justifyContent?: 'start' | 'center' | 'end' | 'space-between';
+  alignItems?: 'start' | 'center' | 'end' | 'stretch';
+  contentBounds?: SimplifiedBounds;
+}
+
+export interface SimplifiedSizeHint {
+  width: 'fixed' | 'content';
+  height: 'fixed' | 'content';
+}
+
 export interface SimplifiedLayer {
   id: number;
   name: string;
@@ -308,19 +466,38 @@ export interface SimplifiedLayer {
   clipped?: boolean;
   isClippingMask?: boolean;
   isAsset?: boolean;
+  parentId?: number;
+  depth?: number;
   zIndex?: number;
   bounds: SimplifiedBounds;
+  boundsMetadata?: SimplifiedBoundsMetadata;
+  intersectsArtboard?: boolean;
+  partiallyOutsideArtboard?: boolean;
   text?: string;
   textStyle?: SimplifiedTextStyle;
+  textStyleRanges?: SimplifiedTextStyleRange[];
+  textMetrics?: SimplifiedTextMetrics;
   fill?: string;
   fills?: SimplifiedFill[];
   stroke?: SimplifiedStroke;
   opacity?: number;
+  fillOpacity?: number;
+  blendMode?: string;
   borderRadius?: number | number[];
   shapeType?: string;
+  pathSummary?: SimplifiedPathSummary;
+  pathData?: SimplifiedPathGeometry;
   shadows?: SimplifiedShadow[];
+  clip?: SimplifiedClipMetadata;
+  adjustment?: SimplifiedAdjustment;
   assetUrl?: string;
   assetUrls?: Record<string, string>;
+  renderStrategy?: SimplifiedRenderStrategy;
+  shouldRenderChildren?: boolean;
+  layoutHint?: SimplifiedLayoutHint;
+  sizeHint?: SimplifiedSizeHint;
+  isTextOnlyContainer?: boolean;
+  containerVisualSourceId?: number;
   children?: SimplifiedLayer[];
 }
 
@@ -370,4 +547,23 @@ export interface DocumentStats {
   groupLayers: number;
   width: number;
   height: number;
+}
+
+export interface RestorationMaskGroup {
+  maskId: number;
+  targetIds: number[];
+  bounds?: SimplifiedBounds;
+}
+
+export interface RestorationPlan {
+  rootIds: number[];
+  paintOrder: number[];
+  rasterAssetIds: number[];
+  textLayerIds: number[];
+  clippedLayerIds: number[];
+  partiallyOutsideArtboardIds: number[];
+  flexContainerIds: number[];
+  textAutoSizeIds: number[];
+  maskGroups: RestorationMaskGroup[];
+  guidance: string[];
 }

@@ -48,6 +48,7 @@ export function registerParseSketchTool(server: McpServer): void {
           includeInvisible: params.include_invisible ?? false,
           normalizeToArtboard: params.normalize_to_artboard ?? true,
         });
+        const restoration = parser.buildRestorationPlan(layers);
         const textLayers = parser.extractTextLayers(document, {
           includeInvisible: params.include_invisible ?? false,
           normalizeToArtboard: params.normalize_to_artboard ?? true,
@@ -69,6 +70,7 @@ export function registerParseSketchTool(server: McpServer): void {
             artboard: typeof artboard;
             stats: typeof stats;
             layers: typeof layers;
+            restoration: typeof restoration;
             textLayers: typeof textLayers;
             assets: typeof assets;
             tokens: typeof tokens;
@@ -83,14 +85,16 @@ export function registerParseSketchTool(server: McpServer): void {
             artboard,
             stats,
             layers: params.include_styles === false ? stripStyles(layers) : layers,
+            restoration,
             textLayers,
             assets,
             tokens,
             renderHints: [
               'bounds.x / bounds.y are artboard-relative by default, while bounds.absoluteX / bounds.absoluteY keep original design coordinates.',
               'assetUrl prefers the highest-density image exposed by Lanhu.',
-              'shapeType and borderRadius can be used to restore rounded rectangles and circles more precisely.',
-              'shadows, opacity, lineHeight and letterSpacing are already normalized for UI recreation.',
+              'shapeType、borderRadius、pathSummary、textStyleRanges、textMetrics 可用于更高保真地还原图标、圆角和文本字重混排。',
+              'restoration.paintOrder / maskGroups / clippedLayerIds 显式给出了绘制顺序和 clipping mask 关系。',
+              'boundsMetadata.frame / visual / original 需要按不同用途使用，不能再只依赖单一 bounds。',
             ],
           },
         };

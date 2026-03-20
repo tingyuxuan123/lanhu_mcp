@@ -7,7 +7,8 @@ export const compareImagesTool = {
   name: 'lanhu_compare_images',
   description: 'Compare a candidate screenshot against the Lanhu reference image and report the biggest visual gaps.',
   inputSchema: {
-    reference_image_url: z.string().url().describe('Reference image URL, usually latestVersion.imageUrl'),
+    reference_image_url: z.string().url().optional().describe('Reference image URL, usually latestVersion.imageUrl'),
+    reference_image_path: z.string().optional().describe('Local reference image path'),
     candidate_image_url: z.string().url().optional().describe('Candidate image URL'),
     candidate_image_path: z.string().optional().describe('Local candidate image path'),
     diff_output_path: z.string().optional().describe('Optional local path for writing a diff heatmap image'),
@@ -26,7 +27,8 @@ export function registerCompareImagesTool(server: McpServer): void {
       inputSchema: compareImagesTool.inputSchema,
     },
     async (params: {
-      reference_image_url: string;
+      reference_image_url?: string;
+      reference_image_path?: string;
       candidate_image_url?: string;
       candidate_image_path?: string;
       diff_output_path?: string;
@@ -36,12 +38,16 @@ export function registerCompareImagesTool(server: McpServer): void {
       grid_cols?: number;
     }) => {
       try {
+        if (!params.reference_image_url && !params.reference_image_path) {
+          throw new Error('reference_image_url or reference_image_path is required');
+        }
         if (!params.candidate_image_url && !params.candidate_image_path) {
           throw new Error('candidate_image_url or candidate_image_path is required');
         }
 
         const result = await imageCompareService.compare({
           referenceImageUrl: params.reference_image_url,
+          referenceImagePath: params.reference_image_path,
           candidateImageUrl: params.candidate_image_url,
           candidateImagePath: params.candidate_image_path,
           diffOutputPath: params.diff_output_path,

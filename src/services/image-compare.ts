@@ -3,7 +3,8 @@ import { dirname, resolve } from 'node:path';
 import { Jimp, diff as jimpDiff, intToRGBA } from 'jimp';
 
 export interface CompareImagesParams {
-  referenceImageUrl: string;
+  referenceImageUrl?: string;
+  referenceImagePath?: string;
   candidateImageUrl?: string;
   candidateImagePath?: string;
   diffOutputPath?: string;
@@ -19,6 +20,9 @@ export interface CompareImagesResult {
   resizedCandidate: boolean;
   visualDiffPercent: number;
   pixelMismatchPercent: number;
+  meanAbsoluteDiffPercent: number;
+  weightedDiffPercent: number;
+  visualSimilarityScore: number;
   mismatchBounds: { x: number; y: number; width: number; height: number } | null;
   worstRegions: Array<{
     row: number;
@@ -28,6 +32,7 @@ export interface CompareImagesResult {
     width: number;
     height: number;
     diffPercent: number;
+    weightedDiffPercent: number;
   }>;
   suggestions: string[];
   diffImagePath?: string;
@@ -35,7 +40,12 @@ export interface CompareImagesResult {
 
 export class ImageCompareService {
   async compare(params: CompareImagesParams): Promise<CompareImagesResult> {
-    const reference = await this.loadImage(params.referenceImageUrl);
+    const referenceSource = params.referenceImageUrl || params.referenceImagePath;
+    if (!referenceSource) {
+      throw new Error('referenceImageUrl or referenceImagePath is required');
+    }
+
+    const reference = await this.loadImage(referenceSource);
     const candidateSource = params.candidateImageUrl || params.candidateImagePath;
     if (!candidateSource) {
       throw new Error('candidateImageUrl or candidateImagePath is required');
@@ -82,6 +92,9 @@ export class ImageCompareService {
       resizedCandidate,
       visualDiffPercent: Number((diffResult.percent * 100).toFixed(2)),
       pixelMismatchPercent: Number(analysis.pixelMismatchPercent.toFixed(2)),
+      meanAbsoluteDiffPercent: Number(analysis.meanAbsoluteDiffPercent.toFixed(2)),
+      weightedDiffPercent: Number(analysis.weightedDiffPercent.toFixed(2)),
+      visualSimilarityScore: Number(analysis.visualSimilarityScore.toFixed(2)),
       mismatchBounds: analysis.mismatchBounds,
       worstRegions: analysis.worstRegions,
       suggestions: this.buildSuggestions(analysis.worstRegions, analysis.mismatchBounds, referenceWidth, referenceHeight, resizedCandidate),
@@ -112,8 +125,16 @@ export class ImageCompareService {
   private analyzePixels(reference: any, candidate: any, mismatchThreshold: number, gridRows: number, gridCols: number) {
     const width = reference.bitmap.width;
     const height = reference.bitmap.height;
-    const tiles = Array.from({ length: gridRows * gridCols }, () => ({ mismatch: 0, total: 0 }));
+    const tiles = Array.from({ length: gridRows * gridCols }, () => ({
+      mismatch: 0,
+      total: 0,
+      weightedDiff: 0,
+      weightTotal: 0,
+    }));
     let mismatchPixels = 0;
+    let diffSum = 0;
+    let weightedDiffSum = 0;
+    let weightSum = 0;
     let minX = width;
     let minY = height;
     let maxX = -1;
@@ -127,7 +148,13 @@ export class ImageCompareService {
         const tileRow = Math.min(gridRows - 1, Math.floor((y / height) * gridRows));
         const tileCol = Math.min(gridCols - 1, Math.floor((x / width) * gridCols));
         const tile = tiles[tileRow * gridCols + tileCol];
+        const weight = this.getPixelWeight(reference, x, y);
         tile.total += 1;
+        tile.weightTotal += weight;
+        tile.weightedDiff += diff * weight;
+        diffSum += diff;
+        weightedDiffSum += diff * weight;
+        weightSum += weight;
 
         if (diff >= mismatchThreshold) {
           tile.mismatch += 1;
@@ -157,18 +184,35 @@ export class ImageCompareService {
           width: Math.min(regionWidth, width - x),
           height: Math.min(regionHeight, height - y),
           diffPercent: tile.total === 0 ? 0 : Number(((tile.mismatch / tile.total) * 100).toFixed(2)),
+          weightedDiffPercent: tile.weightTotal === 0 ? 0 : Number(((tile.weightedDiff / tile.weightTotal) * 100).toFixed(2)),
         };
       })
-      .sort((left, right) => right.diffPercent - left.diffPercent)
+      .sort((left, right) => right.weightedDiffPercent - left.weightedDiffPercent)
       .slice(0, 5);
 
     return {
       pixelMismatchPercent: (mismatchPixels / (width * height)) * 100,
+      meanAbsoluteDiffPercent: (diffSum / (width * height)) * 100,
+      weightedDiffPercent: weightSum === 0 ? 0 : (weightedDiffSum / weightSum) * 100,
+      visualSimilarityScore: Math.max(0, 100 - (weightSum === 0 ? 0 : (weightedDiffSum / weightSum) * 100)),
       mismatchBounds: maxX >= 0
         ? { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 }
         : null,
       worstRegions,
     };
+  }
+
+  private getPixelWeight(image: any, x: number, y: number) {
+    const center = this.getLuminance(intToRGBA(image.getPixelColor(x, y)));
+    const right = this.getLuminance(intToRGBA(image.getPixelColor(Math.min(image.bitmap.width - 1, x + 1), y)));
+    const bottom = this.getLuminance(intToRGBA(image.getPixelColor(x, Math.min(image.bitmap.height - 1, y + 1))));
+    const edgeStrength = (Math.abs(center - right) + Math.abs(center - bottom)) / (255 * 2);
+
+    return 1 + edgeStrength * 4;
+  }
+
+  private getLuminance(pixel: { r: number; g: number; b: number }) {
+    return 0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
   }
 
   private getPixelDiff(left: { r: number; g: number; b: number; a: number }, right: { r: number; g: number; b: number; a: number }) {
@@ -205,12 +249,12 @@ export class ImageCompareService {
         suggestions.push('底部区域差异明显，优先检查 TabBar、高亮态和底部留白。');
       }
       if (mismatchBounds.width > width * 0.85 && mismatchBounds.height > height * 0.85) {
-        suggestions.push('差异覆盖几乎整张图，通常是整体缩放、主背景色或容器宽高不一致。');
+      suggestions.push('差异覆盖几乎整张图，通常是整体缩放、主背景色或容器宽高不一致。');
       }
     }
 
     for (const region of worstRegions.slice(0, 3)) {
-      suggestions.push(`重点修正区域：第 ${region.row + 1} 行第 ${region.col + 1} 列，差异约 ${region.diffPercent}%。`);
+      suggestions.push(`重点修正区域：第 ${region.row + 1} 行第 ${region.col + 1} 列，加权差异约 ${region.weightedDiffPercent}%。`);
     }
 
     if (suggestions.length === 0) {
