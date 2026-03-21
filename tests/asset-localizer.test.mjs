@@ -113,6 +113,46 @@ test('AssetLocalizer records failures and keeps remote asset URL when download f
   assert.equal(layers[1].localAssetPath, undefined);
 });
 
+test('AssetLocalizer retries transient download failures before succeeding', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lanhu-asset-localizer-retry-'));
+  const outputDir = path.join(tempDir, 'assets');
+  const imageBuffer = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x00,
+  ]);
+  let attempts = 0;
+  const localizer = new AssetLocalizer(async () => {
+    attempts += 1;
+    if (attempts < 3) {
+      throw new Error(`temporary failure ${attempts}`);
+    }
+
+    return {
+      buffer: imageBuffer,
+      contentType: 'image/png',
+    };
+  }, {
+    maxAttempts: 3,
+    retryDelayMs: 0,
+  });
+  const layers = [
+    createLayer({
+      id: 9,
+      name: 'Retry Banner',
+      assetUrl: 'https://example.com/assets/retry-banner',
+    }),
+  ];
+
+  const result = await localizer.localize(layers, [], {
+    outputDir,
+  });
+
+  assert.equal(attempts, 3);
+  assert.equal(result.failures.length, 0);
+  assert.equal(result.downloadedFileCount, 1);
+  assert.match(layers[0].assetUrl, /^\.\/assets\/retry-banner-[a-f0-9]{12}\.png$/);
+});
+
 test('StyleExtractor prefers local asset paths over remote asset URLs', async () => {
   const extractor = new StyleExtractor();
   const css = extractor.extractFromLanhuNode(createLayer({

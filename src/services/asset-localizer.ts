@@ -22,6 +22,11 @@ export interface AssetLocalizerOptions {
   publicPathPrefix?: string;
 }
 
+export interface AssetLocalizerRetryOptions {
+  maxAttempts?: number;
+  retryDelayMs?: number;
+}
+
 interface AssetReference {
   id?: number;
   name?: string;
@@ -41,7 +46,16 @@ interface LocalizedAssetRecord {
 }
 
 export class AssetLocalizer {
-  constructor(private readonly downloader: AssetDownloadFn = defaultAssetDownloader) {}
+  private readonly maxAttempts: number;
+  private readonly retryDelayMs: number;
+
+  constructor(
+    private readonly downloader: AssetDownloadFn = defaultAssetDownloader,
+    retryOptions: AssetLocalizerRetryOptions = {},
+  ) {
+    this.maxAttempts = Math.max(1, Math.floor(retryOptions.maxAttempts ?? 3));
+    this.retryDelayMs = Math.max(0, Math.floor(retryOptions.retryDelayMs ?? 250));
+  }
 
   async localize(
     layers: SimplifiedLayer[],
@@ -84,7 +98,7 @@ export class AssetLocalizer {
       let record = bySourceUrl.get(sourceUrl);
       if (!record) {
         try {
-          const { buffer, contentType } = await this.downloader(sourceUrl);
+          const { buffer, contentType } = await this.downloadWithRetry(sourceUrl);
           const contentHash = crypto.createHash('sha1').update(buffer).digest('hex');
           const extension = this.detectAssetExtension(buffer, contentType, sourceUrl);
           const contentKey = `${contentHash}.${extension}`;
@@ -158,6 +172,29 @@ export class AssetLocalizer {
     }
 
     return bucket;
+  }
+
+  private async downloadWithRetry(sourceUrl: string): Promise<AssetBinaryPayload> {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
+      try {
+        return await this.downloader(sourceUrl);
+      } catch (error) {
+        lastError = error;
+        if (attempt >= this.maxAttempts) {
+          break;
+        }
+
+        if (this.retryDelayMs > 0) {
+          await wait(this.retryDelayMs * attempt);
+        }
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(String(lastError));
   }
 
   private getRemoteAssetUrl(reference: AssetReference): string | undefined {
@@ -318,3 +355,9 @@ async function defaultAssetDownloader(sourceUrl: string): Promise<AssetBinaryPay
 }
 
 export const assetLocalizer = new AssetLocalizer();
+
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}

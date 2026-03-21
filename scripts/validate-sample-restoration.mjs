@@ -2083,6 +2083,13 @@ function renderRootFlowContent(nodes) {
   }).join('\n');
 }
 
+function renderRootGridContent(nodes) {
+  return sortByPaint(nodes)
+    .map(node => renderGridPlacedNode(node, 'flow'))
+    .filter(Boolean)
+    .join('\n');
+}
+
 function renderRoot(nodes) {
   const { backgrounds, contents } = collectRootBackdropAndContent(nodes);
   if (backgrounds.length === 0 || contents.length === 0) {
@@ -2093,11 +2100,11 @@ function renderRoot(nodes) {
     .map(node => renderGridPlacedNode(node, 'flow'))
     .filter(Boolean)
     .join('\n');
-  const contentHtml = renderRootFlowContent(contents);
+  const contentHtml = renderRootGridContent(contents);
 
   return [
     `<div ${renderClassAttr('root-background-layer', 'root-background-layer', `grid-area:1 / 1;z-index:0;display:grid;grid-template-columns:minmax(0, 1fr);grid-template-rows:minmax(0, 1fr);width:${artboard.width}px;height:${artboard.height}px;overflow:hidden;box-sizing:border-box`)}>${backgroundHtml}</div>`,
-    `<div ${renderClassAttr('root-content-layer', 'root-content-layer', `grid-area:1 / 1;z-index:1;display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start;width:${artboard.width}px;height:${artboard.height}px;overflow:hidden;box-sizing:border-box`)}>${contentHtml}</div>`,
+    `<div ${renderClassAttr('root-content-layer', 'root-content-layer', `grid-area:1 / 1;z-index:1;display:grid;grid-template-columns:minmax(0, 1fr);grid-template-rows:minmax(0, 1fr);width:${artboard.width}px;height:${artboard.height}px;overflow:hidden;box-sizing:border-box`)}>${contentHtml}</div>`,
   ].join('\n');
 }
 

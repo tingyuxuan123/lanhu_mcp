@@ -1,199 +1,261 @@
-﻿import fs from 'node:fs/promises';
+import fs from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
-import { LanhuParser } from '../dist/services/lanhu-parser.js';
-import { imageCompareService } from '../dist/services/image-compare.js';
+import { fileURLToPath } from 'node:url';
 
-const jsonUrl = process.env.LANHU_JSON_URL || 'https://alipic.lanhuapp.com/psi6socdrxe5mf8z6xtfksqqnh9ecwf2a3b4f00-9a25-48a3-b39e-841eb81ae047';
-const referenceImageUrl = process.env.LANHU_REFERENCE_IMAGE_URL || 'https://alipic.lanhuapp.com/ps1lmw1s8ifmwu5wx8xk0tfmoo0cpvd2mn1c980b2a-494d-4e44-8340-0196159b13a9';
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const validationScriptUrl = new URL('./validate-sample-restoration.mjs', import.meta.url);
 const outputDir = path.resolve(process.env.LANHU_OUTPUT_DIR || 'artifacts/loop');
+const minScore = Number(process.env.RESTORATION_MIN_SCORE || 95);
+const targetMaxAttempts = Math.max(1, Number(process.env.LANHU_TARGET_MAX_ATTEMPTS || 3));
 
 await fs.mkdir(outputDir, { recursive: true });
 
-const response = await fetch(jsonUrl, {
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    Accept: 'application/json, text/plain, */*',
-  },
-});
-if (!response.ok) {
-  throw new Error(`Failed to fetch Lanhu JSON: ${response.status} ${response.statusText}`);
-}
-
-const document = await response.json();
-const parser = new LanhuParser();
-const parsed = parser.parseDocument(document);
-const artboard = parser.getArtboardInfo(parsed);
-const layers = parser.buildLayerTree(parsed, 30, {
-  includeInvisible: false,
-  normalizeToArtboard: true,
-});
-const assets = parser.extractAssets(parsed, {
-  includeInvisible: false,
-  normalizeToArtboard: true,
-});
-
-function escapeHtml(value = '') {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function flatten(nodes) {
-  const result = [];
-  const walk = current => {
-    for (const node of current) {
-      result.push(node);
-      if (node.assetUrl) {
-        continue;
-      }
-      if (node.children?.length) {
-        walk(node.children);
-      }
-    }
-  };
-  walk(nodes);
-  return result;
-}
-
-function hasVisual(node) {
-  return Boolean(
-    node.text
-    || node.assetUrl
-    || node.fill
-    || node.stroke
-    || (node.shadows && node.shadows.length)
+const targets = await resolveTargets();
+if (targets.length === 0) {
+  throw new Error(
+    'No Lanhu targets provided. Use LANHU_PAGE_URL, LANHU_PAGE_URLS, LANHU_TARGETS_FILE, or LANHU_JSON_URL.',
   );
 }
 
-function textStyles(node) {
-  if (!node.textStyle) return '';
-  const ts = node.textStyle;
-  const justify = ts.alignment === 'center' ? 'center' : ts.alignment === 'right' ? 'flex-end' : 'flex-start';
-  return [
-    'display:flex',
-    `justify-content:${justify}`,
-    'align-items:center',
-    'white-space:pre-wrap',
-    'overflow:hidden',
-    `font-size:${ts.fontSize}px`,
-    `font-family:'${ts.fontFamily}','PingFang SC','Microsoft YaHei',sans-serif`,
-    `font-weight:${ts.fontWeight || 400}`,
-    `font-style:${ts.fontStyle || 'normal'}`,
-    `color:${ts.color}`,
-    `text-align:${ts.alignment}`,
-    ts.lineHeight ? `line-height:${ts.lineHeight}px` : '',
-    ts.letterSpacing !== undefined ? `letter-spacing:${ts.letterSpacing}px` : '',
-  ].filter(Boolean).join(';');
-}
-
-function commonStyles(node) {
-  const styles = [
-    'position:absolute',
-    `left:${node.bounds.x}px`,
-    `top:${node.bounds.y}px`,
-    `width:${node.bounds.width}px`,
-    `height:${node.bounds.height}px`,
-    `z-index:${10000 - (node.zIndex || 0)}`,
-    'box-sizing:border-box',
-    'pointer-events:none',
-    '-webkit-font-smoothing:antialiased',
-  ];
-
-  if (node.opacity !== undefined) styles.push(`opacity:${node.opacity}`);
-  if (node.borderRadius !== undefined) {
-    const radius = Array.isArray(node.borderRadius)
-      ? node.borderRadius.map(value => `${value}px`).join(' ')
-      : `${node.borderRadius}px`;
-    styles.push(`border-radius:${radius}`);
-    styles.push('overflow:hidden');
-  }
-  if (node.stroke) styles.push(`border:${node.stroke.width}px solid ${node.stroke.color}`);
-  if (node.fill) {
-    if (node.fill.startsWith('linear-gradient') || node.fill.startsWith('radial-gradient')) {
-      styles.push(`background:${node.fill}`);
-    } else {
-      styles.push(`background:${node.fill}`);
-    }
-  }
-  if (node.shadows?.length) {
-    styles.push(`box-shadow:${node.shadows.map(shadow => `${shadow.type === 'innerShadow' ? 'inset ' : ''}${shadow.x}px ${shadow.y}px ${shadow.blur}px ${shadow.spread}px ${shadow.color}`).join(',')}`);
-  }
-  return styles.join(';');
-}
-
-function renderNode(node) {
-  const style = commonStyles(node);
-  if (node.assetUrl) {
-    return `<div class="layer layer-${node.type}" style="${style}"><img src="${node.assetUrl}" style="width:100%;height:100%;display:block;object-fit:fill;" /></div>`;
-  }
-  if (node.text) {
-    return `<div class="layer layer-text" style="${style};${textStyles(node)}">${escapeHtml(node.text)}</div>`;
-  }
-  return `<div class="layer layer-${node.type}" style="${style}"></div>`;
-}
-
-const flatLayers = flatten(layers).filter(node => {
-  if (!hasVisual(node)) return false;
-  if (node.opacity !== undefined && node.opacity <= 0.001) return false;
-  if (node.bounds.width <= 0 || node.bounds.height <= 0) return false;
-  if (node.bounds.y < 0) return false;
-  if (node.bounds.x >= artboard.width || node.bounds.y >= artboard.height) return false;
-  if (node.bounds.x + node.bounds.width <= 0 || node.bounds.y + node.bounds.height <= 0) return false;
-  return true;
-});
-const html = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=${artboard.width}, initial-scale=1.0" />
-  <title>${escapeHtml(artboard.name)}</title>
-  <style>
-    html, body { margin: 0; padding: 0; background: #fff; }
-    body { width: ${artboard.width}px; height: ${artboard.height}px; overflow: hidden; }
-    #artboard { position: relative; width: ${artboard.width}px; height: ${artboard.height}px; background: #fff; overflow: hidden; }
-    .layer-text { word-break: break-word; }
-  </style>
-</head>
-<body>
-  <div id="artboard">${flatLayers.map(renderNode).join('\n')}</div>
-</body>
-</html>`;
-
-const htmlPath = path.join(outputDir, 'restoration-v2.html');
-const screenshotPath = path.join(outputDir, 'restoration-v2.png');
-const diffPath = path.join(outputDir, 'diff-v2.png');
-const metaPath = path.join(outputDir, 'meta-v2.json');
-
-await fs.writeFile(htmlPath, html, 'utf8');
-
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: Math.ceil(artboard.width), height: Math.ceil(artboard.height) }, deviceScaleFactor: 1 });
-await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle' });
-await page.locator('#artboard').screenshot({ path: screenshotPath });
-await browser.close();
-
-const compareResult = await imageCompareService.compare({
-  referenceImageUrl,
-  candidateImagePath: screenshotPath,
-  diffOutputPath: diffPath,
-  resizeCandidate: true,
-  gridRows: 6,
-  gridCols: 4,
-});
-
-const result = {
-  artboard,
-  flatLayerCount: flatLayers.length,
-  assetCount: assets.length,
-  htmlPath,
-  screenshotPath,
-  diffPath,
-  compare: compareResult,
+const summary = {
+  generatedAt: new Date().toISOString(),
+  minScore,
+  targetMaxAttempts,
+  outputDir,
+  total: targets.length,
+  passed: 0,
+  failed: 0,
+  belowThreshold: 0,
+  items: [],
 };
 
-await fs.writeFile(metaPath, JSON.stringify(result, null, 2), 'utf8');
-console.log(JSON.stringify(result, null, 2));
+for (let index = 0; index < targets.length; index += 1) {
+  const target = normalizeTarget(targets[index], index);
+  const targetOutputDir = path.join(outputDir, target.prefix);
+  await fs.mkdir(targetOutputDir, { recursive: true });
+
+  try {
+    const { attempts } = await runValidationWithRetry(target, targetOutputDir);
+    const metaPath = path.join(targetOutputDir, `${target.prefix}-meta.json`);
+    const meta = JSON.parse(await fs.readFile(metaPath, 'utf8'));
+    const score = Number(meta.compare?.visualSimilarityScore || 0);
+    const passed = score >= minScore;
+    if (passed) {
+      summary.passed += 1;
+    } else {
+      summary.belowThreshold += 1;
+    }
+
+    summary.items.push({
+      prefix: target.prefix,
+      status: passed ? 'passed' : 'below-threshold',
+      score,
+      attempts,
+      pageUrl: target.pageUrl || undefined,
+      jsonUrl: target.jsonUrl || undefined,
+      referenceImageUrl: meta.source?.referenceImageUrl || target.referenceImageUrl || undefined,
+      htmlPath: meta.htmlPath,
+      screenshotPath: meta.screenshotPath,
+      diffPath: meta.diffPath,
+      metaPath,
+    });
+  } catch (error) {
+    summary.failed += 1;
+    summary.items.push({
+      prefix: target.prefix,
+      status: 'failed',
+      attempts: targetMaxAttempts,
+      pageUrl: target.pageUrl || undefined,
+      jsonUrl: target.jsonUrl || undefined,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+const summaryPath = path.join(outputDir, 'restoration-summary.json');
+await fs.writeFile(summaryPath, JSON.stringify(summary, null, 2), 'utf8');
+console.log(JSON.stringify({ ...summary, summaryPath }, null, 2));
+
+if (summary.failed > 0 || summary.belowThreshold > 0) {
+  process.exitCode = 1;
+}
+
+async function resolveTargets() {
+  const targetsFile = process.env.LANHU_TARGETS_FILE;
+  if (targetsFile) {
+    const raw = await fs.readFile(path.resolve(targetsFile), 'utf8');
+    return parseTargets(raw);
+  }
+
+  const pageUrls = process.env.LANHU_PAGE_URLS;
+  if (pageUrls) {
+    return parseTargetList(pageUrls).map(pageUrl => ({ pageUrl }));
+  }
+
+  const pageUrl = process.env.LANHU_PAGE_URL;
+  if (pageUrl) {
+    return [{ pageUrl }];
+  }
+
+  const jsonUrl = process.env.LANHU_JSON_URL;
+  if (jsonUrl) {
+    return [{
+      jsonUrl,
+      referenceImageUrl: process.env.LANHU_REFERENCE_IMAGE_URL || undefined,
+      prefix: process.env.RESTORATION_OUTPUT_PREFIX || undefined,
+    }];
+  }
+
+  return [];
+}
+
+function parseTargets(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  if (trimmed.startsWith('[')) {
+    const parsed = JSON.parse(trimmed);
+    if (!Array.isArray(parsed)) {
+      throw new Error('LANHU_TARGETS_FILE must contain a JSON array.');
+    }
+
+    return parsed.map(item => {
+      if (typeof item === 'string') {
+        return { pageUrl: item };
+      }
+      return item;
+    });
+  }
+
+  return parseTargetList(trimmed).map(pageUrl => ({ pageUrl }));
+}
+
+function parseTargetList(raw) {
+  return String(raw || '')
+    .split(/[\r\n,]+/)
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeTarget(target, index) {
+  if (!target || (typeof target !== 'object' && typeof target !== 'string')) {
+    throw new Error(`Invalid target at index ${index}`);
+  }
+
+  const normalized = typeof target === 'string'
+    ? { pageUrl: target }
+    : {
+        pageUrl: target.pageUrl,
+        jsonUrl: target.jsonUrl,
+        referenceImageUrl: target.referenceImageUrl,
+        prefix: target.prefix,
+      };
+
+  if (!normalized.pageUrl && !normalized.jsonUrl) {
+    throw new Error(`Target ${index + 1} is missing pageUrl/jsonUrl`);
+  }
+
+  return {
+    ...normalized,
+    prefix: normalized.prefix || derivePrefix(normalized, index),
+  };
+}
+
+function derivePrefix(target, index) {
+  if (target.pageUrl) {
+    try {
+      const parsedUrl = new URL(target.pageUrl);
+      const hash = parsedUrl.hash.startsWith('#')
+        ? parsedUrl.hash.slice(1)
+        : parsedUrl.hash;
+      const queryString = hash.includes('?')
+        ? hash.split('?')[1]
+        : parsedUrl.searchParams.toString();
+      const params = new URLSearchParams(queryString);
+      const imageId = params.get('image_id');
+      if (imageId) {
+        return imageId.slice(0, 8);
+      }
+    } catch {
+      // ignore and fall back to index-based prefix
+    }
+  }
+
+  if (target.jsonUrl) {
+    try {
+      const parsedUrl = new URL(target.jsonUrl);
+      const basename = path.basename(parsedUrl.pathname).replace(/[^a-z0-9]+/gi, '');
+      if (basename) {
+        return basename.slice(0, 12);
+      }
+    } catch {
+      // ignore and fall back to index-based prefix
+    }
+  }
+
+  return `target-${String(index + 1).padStart(2, '0')}`;
+}
+
+async function runValidation(target, targetOutputDir) {
+  const previousEnv = {
+    LANHU_PAGE_URL: process.env.LANHU_PAGE_URL,
+    LANHU_JSON_URL: process.env.LANHU_JSON_URL,
+    LANHU_REFERENCE_IMAGE_URL: process.env.LANHU_REFERENCE_IMAGE_URL,
+    LANHU_OUTPUT_DIR: process.env.LANHU_OUTPUT_DIR,
+    RESTORATION_OUTPUT_PREFIX: process.env.RESTORATION_OUTPUT_PREFIX,
+  };
+
+  process.chdir(repoRoot);
+  process.env.LANHU_PAGE_URL = target.pageUrl || '';
+  process.env.LANHU_JSON_URL = target.jsonUrl || '';
+  process.env.LANHU_REFERENCE_IMAGE_URL = target.referenceImageUrl || '';
+  process.env.LANHU_OUTPUT_DIR = targetOutputDir;
+  process.env.RESTORATION_OUTPUT_PREFIX = target.prefix;
+
+  try {
+    await import(`${validationScriptUrl.href}?run=${Date.now()}-${target.prefix}`);
+  } finally {
+    restoreEnv(previousEnv);
+  }
+}
+
+async function runValidationWithRetry(target, targetOutputDir) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= targetMaxAttempts; attempt += 1) {
+    try {
+      await runValidation(target, targetOutputDir);
+      return { attempts: attempt };
+    } catch (error) {
+      lastError = error;
+      if (attempt >= targetMaxAttempts) {
+        break;
+      }
+
+      await wait(300 * attempt);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(String(lastError));
+}
+
+function restoreEnv(previousEnv) {
+  for (const [key, value] of Object.entries(previousEnv)) {
+    if (value === undefined) {
+      delete process.env[key];
+      continue;
+    }
+
+    process.env[key] = value;
+  }
+}
+
+function wait(ms) {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
