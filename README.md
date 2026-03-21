@@ -1,28 +1,45 @@
 # Lanhu MCP
 
-用于从蓝湖设计页获取最新版本 `json_url`，解析 Sketch JSON，并输出适合页面还原的结构化数据。
+蓝湖设计还原 MCP。
 
-当前仓库同时包含两部分能力：
+当前仓库的对外定位已经收口为一件事：
 
-- MCP Server：给 Claude Code / 其他 MCP Client 提供蓝湖解析工具
-- 本地验证脚本：把解析结果渲染成 HTML，再和参考图做自动对比
+- 输入蓝湖页面 URL 或 `json_url`
+- 输出高保真 HTML 页面
+- 同时落地对应图片资源
+- 可选输出预览图、diff 图和相似度分数
 
-## 当前状态
+这个 MCP 不负责直接生成 uniapp、微信小程序、React、Vue 页面代码。
+它只负责把设计稿交付成 `HTML + 图片资源`，下游项目再根据 HTML 自己重构成目标界面。
 
-截至 2026-03-20，仓库内这条真实蓝湖样例链路已经验证通过：
+## 当前能力
 
-- 页面 URL 会解析出 `project_id`、`image_id`
-- 当 URL 里没有 `team_id` 时，会自动请求 `/api/account/user_settings?settings_type=web_main` 解析当前团队
-- 会自动取 `versions[0]` 对应的最新 `json_url`
-- 会生成 HTML、截图、diff 图和对比元数据
+当前默认暴露的 MCP 工具只有 4 个：
 
-当前 HTML 生成器的输出特性：
+- `lanhu_set_cookie`
+  - 设置蓝湖登录 Cookie
+- `lanhu_render_html`
+  - 单页输出 HTML 交付物
+- `lanhu_render_batch`
+  - 批量输出 HTML 交付物并生成验收 summary
+- `lanhu_compare_images`
+  - 比较实现图和参考图，输出 diff 和相似度
 
-- 样式集中写入 `<style>`，不再使用内联 `style=""`
-- class 名按语义前缀生成，例如 `root-flow-row-*`、`status-bar-*`、`text-layer-*`
-- 优先使用 flex / 盒模型排版
-- 对纯文本容器尽量不强写宽高
-- 当前真实样例输出中 `position:absolute = 0`、`position:relative = 0`
+## 适用场景
+
+这个 MCP 适合下面这种工作流：
+
+1. 设计在蓝湖里
+2. 通过 MCP 拉取页面
+3. 生成 HTML 和图片资源
+4. 交给别的项目或别的 Agent
+5. 对方根据 HTML 自己重构成：
+   - uniapp
+   - 微信小程序
+   - React
+   - Vue
+   - 原生 H5
+6. 最后再拿实现截图回来做对比验收
 
 ## 安装
 
@@ -31,7 +48,44 @@ npm install
 npm run build
 ```
 
-## 可用脚本
+## 启动 MCP Server
+
+```bash
+node dist/index.js
+```
+
+也可以在 MCP Client 中配置：
+
+```json
+{
+  "mcpServers": {
+    "lanhu": {
+      "command": "node",
+      "args": ["E:/project/lanhu_mcp/dist/index.js"],
+      "env": {
+        "LANHU_COOKIE": "your-lanhu-cookie"
+      }
+    }
+  }
+}
+```
+
+## Cookie 说明
+
+蓝湖接口依赖登录态。
+
+Cookie 可以通过两种方式提供：
+
+- 环境变量 `LANHU_COOKIE`
+- MCP 工具 `lanhu_set_cookie`
+
+建议：
+
+- 只在本地环境变量或 MCP 会话里传递 Cookie
+- 不要把 Cookie 写入仓库
+- 不要把 Cookie 发到 issue、日志或截图里
+
+## 常用脚本
 
 ```bash
 npm run build
@@ -43,296 +97,298 @@ npm run restore:loop
 
 说明：
 
-- `npm run test`：编译并执行 `tests/*.test.mjs`
-- `npm run validate:sample`：基于仓库内 `tmp_sample.json` 和 `tmp_sample.png` 跑本地还原验证
-- `npm run render:lanhu`：和 `validate:sample` 使用同一个渲染脚本，但通常配合环境变量跑真实蓝湖页面
-- `npm run restore:loop`：循环执行蓝湖还原流程，便于连续调试
+- `npm run test`
+  - 编译并执行测试
+- `npm run validate:sample`
+  - 运行单页 HTML 还原验证
+- `npm run render:lanhu`
+  - 与 `validate:sample` 使用同一条 HTML 还原链路
+- `npm run restore:loop`
+  - 运行批量 HTML 还原和 summary 验收
 
 ## MCP 工具
 
-Server 启动后会注册以下工具：
+### `lanhu_set_cookie`
 
-- `lanhu_fetch_design`
-  - 输入蓝湖页面 URL
-  - 返回设计元数据、最新版本信息、`json_url`、`image_url`
+设置蓝湖 Cookie，后续工具无需重复传入。
 
-- `lanhu_prepare_restoration`
-  - 输入蓝湖页面 URL
-  - 直接返回完整还原 bundle
-  - 包含 `artboard`、`layers`、`restoration`、`assets`、`tokens`、`renderHints`
-
-- `lanhu_parse_sketch`
-  - 输入 `json_url`
-  - 返回标准化后的图层树和还原计划
-  - 支持 `output_format=css|tailwind|react|vue`
-
-- `lanhu_compare_images`
-  - 对比候选图和参考图
-  - 输出差异百分比、热点区域、建议、diff 图路径
-
-- `lanhu_set_cookie`
-  - 设置默认 Cookie，后续工具调用可不重复传
-
-## 启动 MCP Server
-
-```bash
-npm run build
-node dist/index.js
-```
-
-也可以在 MCP Client 配置中接入：
+输入：
 
 ```json
 {
-  "mcpServers": {
-    "lanhu": {
-      "command": "node",
-      "args": ["D:/project/lanhu_mcp/dist/index.js"],
-      "env": {
-        "LANHU_COOKIE": "your-cookie"
+  "cookie": "your-cookie"
+}
+```
+
+### `lanhu_render_html`
+
+把一个蓝湖页面或 `json_url` 还原成单页 HTML 交付物。
+
+输入：
+
+```json
+{
+  "url": "https://lanhuapp.com/web/#/item/project/detailDetach?...",
+  "cookie": "optional-cookie",
+  "output_dir": "artifacts/single-page",
+  "output_prefix": "profile-page"
+}
+```
+
+或：
+
+```json
+{
+  "json_url": "https://alipic.lanhuapp.com/...",
+  "reference_image_url": "https://alipic.lanhuapp.com/...",
+  "output_dir": "artifacts/single-page",
+  "output_prefix": "profile-page"
+}
+```
+
+输出格式为 `html-assets-only`：
+
+```json
+{
+  "success": true,
+  "data": {
+    "mode": "html-assets-only",
+    "source": {
+      "pageUrl": "...",
+      "jsonUrl": "...",
+      "designName": "...",
+      "referenceImageUrl": "..."
+    },
+    "htmlPath": "E:/project/.../profile-page.html",
+    "previewImagePath": "E:/project/.../profile-page.png",
+    "diffImagePath": "E:/project/.../profile-page-diff.png",
+    "assetDirectory": "E:/project/.../profile-page-assets",
+    "assetPublicPathPrefix": "./profile-page-assets",
+    "assetFiles": [
+      {
+        "fileName": "icon-user.png",
+        "localPath": "./profile-page-assets/icon-user.png",
+        "filePath": "E:/project/.../icon-user.png",
+        "sourceUrl": "https://..."
       }
-    }
+    ],
+    "similarityScore": 96.75,
+    "handoffNotes": [
+      "This MCP only hands off HTML and localized image assets for downstream reconstruction."
+    ]
   }
 }
 ```
 
-## Cookie 说明
+你真正需要交给下游项目的就是：
 
-真实蓝湖页面接口依赖登录态。Cookie 可以通过两种方式提供：
+- `htmlPath`
+- `assetDirectory`
+- `assetFiles`
 
-- 环境变量 `LANHU_COOKIE`
-- MCP 工具 `lanhu_set_cookie`
+### `lanhu_render_batch`
 
-建议：
+批量输出 HTML 交付物。
 
-- 只在本地环境变量或 MCP 会话里传递
-- 不要把 Cookie 写入代码库
-- 不要把 Cookie 提交到 issue、日志或截图里
+输入支持三种形式：
 
-## 蓝湖 URL 解析逻辑
+1. `urls`
 
-支持类似下面的页面地址：
-
-```text
-https://lanhuapp.com/web/#/item/project/detailDetach?pid=...&project_id=...&image_id=...&fromEditor=true
+```json
+{
+  "urls": [
+    "https://lanhuapp.com/web/#/item/project/detailDetach?...image_id=aaa",
+    "https://lanhuapp.com/web/#/item/project/detailDetach?...image_id=bbb"
+  ],
+  "output_dir": "artifacts/batch",
+  "min_score": 95
+}
 ```
 
-解析逻辑：
+2. `json_urls`
 
-1. 从 hash query 中提取 `pid/project_id` 和 `image_id`
-2. 如果 URL 缺少 `tid/team_id`，自动请求：
-
-```text
-https://lanhuapp.com/api/account/user_settings?settings_type=web_main
+```json
+{
+  "json_urls": [
+    "https://alipic.lanhuapp.com/a",
+    "https://alipic.lanhuapp.com/b"
+  ],
+  "output_dir": "artifacts/batch"
+}
 ```
 
-3. 从返回的 `teamStatus.team_id` 中补齐团队 ID
-4. 请求：
+3. `targets`
 
-```text
-https://lanhuapp.com/api/project/image?dds_status=1&image_id=...&project_id=...&team_id=...
+```json
+{
+  "targets": [
+    {
+      "url": "https://lanhuapp.com/web/#/item/project/detailDetach?...image_id=aaa",
+      "prefix": "page-a"
+    },
+    {
+      "json_url": "https://alipic.lanhuapp.com/b",
+      "reference_image_url": "https://alipic.lanhuapp.com/b.png",
+      "prefix": "page-b"
+    }
+  ],
+  "output_dir": "artifacts/batch",
+  "min_score": 95,
+  "max_attempts": 3
+}
 ```
 
-5. 从 `result.versions[0].json_url` 获取最新设计 JSON
-6. 从 `result.url` 或 `versions[0].url` 获取参考图
+输出会生成：
 
-## 本地还原验证
+- 每个页面自己的 HTML 和资源目录
+- 一个批量 summary 文件
 
-核心脚本：
+summary 返回字段同样只保留 HTML 交付信息：
 
-- [scripts/validate-sample-restoration.mjs](/D:/project/lanhu_mcp/scripts/validate-sample-restoration.mjs)
+- `htmlPath`
+- `assetDirectory`
+- `assetFiles`
+- `previewImagePath`
+- `diffImagePath`
+- `similarityScore`
 
-它支持三种输入模式：
+### `lanhu_compare_images`
 
-### 1. 本地样例
+把你的实现截图和参考图做对比，输出：
 
-默认使用仓库根目录下：
+- 相似度分数
+- diff 图
+- 重点差异区域
 
-- `tmp_sample.json`
-- `tmp_sample.png`
+这个工具适合在下游项目重构完成后做回归验收。
 
-直接执行：
+## 推荐工作流
 
-```bash
-npm run validate:sample
-```
+### 给别的项目交付 UI 参考
 
-### 2. 直接输入 json_url
+1. 调 `lanhu_set_cookie`
+2. 调 `lanhu_render_html` 或 `lanhu_render_batch`
+3. 把下面这些交给下游项目：
+   - HTML 文件
+   - 图片资源目录
+   - 图片资源清单
+4. 下游项目自己根据 HTML 重构成目标界面
+5. 实现完后截图
+6. 用 `lanhu_compare_images` 做验收
 
-```bash
-set LANHU_JSON_URL=https://...
-set LANHU_REFERENCE_IMAGE_URL=https://...
-node scripts/validate-sample-restoration.mjs
-```
+### uniapp / 微信小程序项目怎么用
 
-### 3. 真实蓝湖页面 URL
+正确方式不是“让这个 MCP 直接生成 uniapp 页面”。
 
-```bash
-set LANHU_PAGE_URL=https://lanhuapp.com/web/#/item/project/detailDetach?pid=...&project_id=...&image_id=...
-set LANHU_COOKIE=your-cookie
-node scripts/validate-sample-restoration.mjs
-```
+正确方式是：
 
-常用环境变量：
+1. 用这个 MCP 拿到 HTML 和资源
+2. 在 uniapp 项目中根据 HTML 自己拆成 `view / text / image`
+3. 尺寸、层级、资源引用按 HTML 对齐
+4. 页面完成后截图
+5. 再回到这个 MCP 做图像对比
 
-- `LANHU_PAGE_URL`
-- `LANHU_COOKIE`
-- `LANHU_JSON_URL`
-- `LANHU_REFERENCE_IMAGE_URL`
-- `LANHU_OUTPUT_DIR`
-- `RESTORATION_OUTPUT_PREFIX`
-- `SAMPLE_JSON_PATH`
-- `SAMPLE_REFERENCE_PATH`
-- `SAMPLE_STATUS_TIME`
-- `SAMPLE_STATUS_APP`
+也就是：
+
+- 本 MCP 负责交付设计参考
+- 你的业务项目负责真正实现页面
 
 ## 输出产物
 
-验证脚本会输出：
+单页一般会生成：
 
-- `*.html`：还原后的 HTML
-- `*.png`：HTML 截图
-- `*-diff.png`：候选图和参考图的差异热力图
-- `*-meta.json`：对比结果、文件路径、参考图信息
-- `*-bundle.json`：解析后的 artboard / layers / restoration bundle
+- `*.html`
+  - 还原后的 HTML 页面
+- `*.png`
+  - HTML 预览图
+- `*-diff.png`
+  - 与参考图的差异图
+- `*-meta.json`
+  - 内部详细元数据
+- `*-bundle.json`
+  - 内部详细 bundle
+- `*-assets/`
+  - 本地化后的图片资源目录
 
-默认输出目录：
+默认情况下，对外 MCP 返回不会把内部详细 bundle 作为主要交付内容，只返回 HTML handoff 信息。
 
-- 本地样例：`artifacts/sample-validation`
-- 蓝湖页面：`artifacts/lanhu-restoration`
+## 命令行批量使用
 
-## HTML 生成策略
+### 单页
 
-当前渲染器是“保真优先，但尽量不用定位”的策略：
-
-- 根节点优先拆成背景层和内容层
-- 内容层优先转成 flow row，再用 margin / padding 排版
-- 已识别的行列容器优先走 flex
-- 图标和矢量优先保留 shape / path 信息
-- 遮罩关系使用 `maskGroups` 和 `clip` 信息还原
-- 仍需保真的复杂图形，使用 `clip-path:path(...)`
-
-当前样式输出策略：
-
-- 所有动态样式统一注册到 `<style>`
-- DOM 上只保留 class，不写内联 `style`
-- class 名会按用途生成前缀，例如：
-  - `root-background-layer-*`
-  - `root-content-layer-*`
-  - `root-flow-row-*`
-  - `status-bar-*`
-  - `text-layer-*`
-  - `container-layer-*`
-  - `shape-layer-*`
-
-## 已验证结果
-
-### 真实蓝湖样例
-
-使用页面：
-
-```text
-https://lanhuapp.com/web/#/item/project/detailDetach?pid=99c9fbd1-d50d-41f8-a8c0-7ab825b0570e&project_id=99c9fbd1-d50d-41f8-a8c0-7ab825b0570e&image_id=a22621e1-2b15-4e09-9856-a5fadd06977d&fromEditor=true
+```bash
+set LANHU_PAGE_URL=https://lanhuapp.com/web/#/item/project/detailDetach?pid=...&image_id=...
+set LANHU_COOKIE=your-cookie
+set LANHU_OUTPUT_DIR=artifacts/single
+set RESTORATION_OUTPUT_PREFIX=single-page
+node scripts/validate-sample-restoration.mjs
 ```
 
-2026-03-20 实测结果：
+### 批量
 
-- 最新版本：`版本4`
-- 输出文件：[a22621e1.html](/D:/project/lanhu_mcp/artifacts/example-a22621e1/a22621e1.html)
-- 视觉相似度：`97.70`
-- `style=""` 数量：`0`
-- `position:absolute` 数量：`0`
-- `position:relative` 数量：`0`
-
-### 本地样例
-
-使用：
-
-- [tmp_sample.json](/D:/project/lanhu_mcp/tmp_sample.json)
-- [tmp_sample.png](/D:/project/lanhu_mcp/tmp_sample.png)
-
-当前基线结果：
-
-- 输出文件：[sample-restoration.html](/D:/project/lanhu_mcp/artifacts/sample-validation/sample-restoration.html)
-- 视觉相似度：`90.03`
-
-## 目录结构
-
-```text
-lanhu_mcp/
-├─ src/
-│  ├─ config/
-│  │  └─ cookie-manager.ts
-│  ├─ services/
-│  │  ├─ image-compare.ts
-│  │  ├─ lanhu-client.ts
-│  │  ├─ lanhu-parser.ts
-│  │  └─ style-extractor.ts
-│  ├─ tools/
-│  │  ├─ compare-images.ts
-│  │  ├─ fetch-design.ts
-│  │  ├─ parse-sketch.ts
-│  │  ├─ prepare-restoration.ts
-│  │  └─ set-cookie.ts
-│  ├─ utils/
-│  │  ├─ error.ts
-│  │  ├─ logger.ts
-│  │  └─ url-parser.ts
-│  ├─ index.ts
-│  └─ server.ts
-├─ scripts/
-│  ├─ run-lanhu-loop.mjs
-│  └─ validate-sample-restoration.mjs
-├─ tests/
-│  ├─ lanhu-client.test.mjs
-│  ├─ lanhu-parser.test.mjs
-│  └─ url-parser.test.mjs
-├─ artifacts/
-├─ tmp_sample.json
-├─ tmp_sample.png
-└─ README.md
+```bash
+set LANHU_COOKIE=your-cookie
+set LANHU_PAGE_URLS=https://lanhuapp.com/web/#/item/project/detailDetach?...image_id=aaa,https://lanhuapp.com/web/#/item/project/detailDetach?...image_id=bbb
+set LANHU_OUTPUT_DIR=artifacts/batch
+set RESTORATION_MIN_SCORE=95
+set LANHU_TARGET_MAX_ATTEMPTS=3
+node scripts/run-lanhu-loop.mjs
 ```
 
-## 开发建议
+也支持：
 
-- 每次改解析逻辑后先跑 `npm run test`
-- 渲染逻辑改动后，再跑一次 `npm run validate:sample`
-- 调整真实案例时，同时关注：
-  - 圆角是否丢失
-  - 渐变角度是否正确
-  - 图标是否缺失
-  - 是否又引入了 `absolute/relative`
-  - 文本容器是否被写死宽高
+- `LANHU_TARGETS_FILE`
+- `LANHU_JSON_URL`
+- `LANHU_REFERENCE_IMAGE_URL`
 
-## MCP asset localization
+## 当前约束
 
-`lanhu_prepare_restoration` and `lanhu_parse_sketch` now support local asset export:
+当前版本有一个明确约束：
 
-- `download_assets`
-  - default: `true`
-  - when enabled, remote Lanhu image URLs are downloaded locally and `assetUrl` is rewritten to the local public path
+- 对外只交付 HTML 和图片资源
 
-- `asset_output_dir`
-  - optional local directory for downloaded asset files
+这意味着：
 
-- `asset_public_path`
-  - optional public path prefix written back into `assetUrl` / `localAssetPath`
+- 不承诺直接输出 uniapp 页面
+- 不承诺直接输出微信小程序页面
+- 不承诺直接输出 React/Vue 业务组件
 
-When asset localization is enabled, response payloads also include:
+如果你要做这些，应该在下游项目里消费 `htmlPath + assetDirectory + assetFiles` 自己重构。
 
-- `localizedAssets`
-  - downloaded file manifest
-  - content hash, local path, source URL, failure list
+## 仓库结构
 
-- `remoteAssetUrl`
-  - original Lanhu asset URL kept on each layer / asset node
+```text
+src/
+  services/
+    html-restoration-runner.ts
+    html-restoration-batch-runner.ts
+    html-handoff.ts
+  tools/
+    render-html.ts
+    render-html-batch.ts
+    compare-images.ts
+    set-cookie.ts
+  runtime/
+    html-restoration-runtime.mjs
 
-- `localAssetPath`
-  - local public path used by generated HTML / CSS / code output
+scripts/
+  validate-sample-restoration.mjs
+  run-lanhu-loop.mjs
+  copy-runtime-to-dist.mjs
 
-- `localAssetFilePath`
-  - absolute local file path on disk
+tests/
+  *.test.mjs
+```
 
-## License
+## 当前建议
 
-MIT
+如果你的目标是“别的开发项目拿去做页面”，请统一按下面方式接入：
+
+1. `lanhu_render_html`
+2. 读取 `htmlPath`
+3. 读取 `assetDirectory` 和 `assetFiles`
+4. 按 HTML 自己重构
+5. 用 `lanhu_compare_images` 验收
+
+不要再把这个 MCP 当成“直接吐目标框架代码生成器”。
+它现在的职责就是稳定输出 HTML handoff。
