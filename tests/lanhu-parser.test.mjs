@@ -21,6 +21,10 @@ async function loadSampleLayers() {
   };
 }
 
+async function loadSamplePayload() {
+  return JSON.parse(await fs.readFile(samplePath, 'utf8'));
+}
+
 function flatten(nodes, output = []) {
   for (const node of nodes) {
     output.push(node);
@@ -29,6 +33,23 @@ function flatten(nodes, output = []) {
     }
   }
   return output;
+}
+
+function findRawLayer(layers, predicate) {
+  for (const layer of layers) {
+    if (predicate(layer)) {
+      return layer;
+    }
+
+    if (layer.layers?.length) {
+      const match = findRawLayer(layer.layers, predicate);
+      if (match) {
+        return match;
+      }
+    }
+  }
+
+  return null;
 }
 
 test('parser extracts restoration masks and paint order for sample', async () => {
@@ -103,6 +124,25 @@ test('parser drops abnormal single-line leading values', async () => {
   assert.ok(searchPlaceholder?.textStyle, 'expected search placeholder text style');
   assert.equal(searchPlaceholder.textStyle.lineHeight, undefined);
   assert.equal(menuLabel?.textStyle?.lineHeight, undefined);
+});
+
+test('parser converts Lanhu tracking units into CSS letter spacing', async () => {
+  const payload = await loadSamplePayload();
+  const rawLayer = findRawLayer(payload.board.layers, layer => layer.id === 24225);
+
+  assert.ok(rawLayer?.textInfo, 'expected a text layer with textInfo');
+  rawLayer.textInfo.tracking = 20;
+
+  const parser = new LanhuParser();
+  const document = parser.parseDocument(payload);
+  const layers = parser.buildLayerTree(document, 30, {
+    includeInvisible: false,
+    normalizeToArtboard: true,
+  });
+  const all = flatten(layers);
+  const searchPlaceholder = all.find(node => node.id === 24225);
+
+  assert.equal(searchPlaceholder?.textStyle?.letterSpacing, 0.56);
 });
 
 test('parser normalizes sample gradient angles and border radii for restoration', async () => {

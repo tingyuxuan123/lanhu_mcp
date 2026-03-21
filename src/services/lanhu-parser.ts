@@ -1164,7 +1164,7 @@ export class LanhuParser {
       color: firstStyle?.color ? this.colorToHex(firstStyle.color) : textInfo.color ? this.colorToHex(textInfo.color) : '#000000',
       alignment: textInfo.justification || 'left',
       lineHeight: this.normalizeTextLineHeight(textInfo, fontSize),
-      letterSpacing: textInfo.tracking ?? undefined,
+      letterSpacing: this.normalizeTextLetterSpacing(textInfo, fontSize),
     };
   }
 
@@ -1192,6 +1192,34 @@ export class LanhuParser {
     }
 
     return Number(leading.toFixed(2));
+  }
+
+  private normalizeTextLetterSpacing(textInfo: LanhuLayer['textInfo'], fontSize: number): number | undefined {
+    const tracking = textInfo?.tracking ?? undefined;
+    if (tracking === undefined || tracking === null || !Number.isFinite(tracking) || tracking === 0) {
+      return undefined;
+    }
+
+    // Lanhu often preserves Adobe-style tracking units (1/1000 em) instead of CSS pixels.
+    const needsEmConversion = Math.abs(tracking) > Math.max(4, fontSize * 0.18);
+    const normalized = needsEmConversion
+      ? fontSize * (tracking / 1000)
+      : tracking;
+
+    if (!Number.isFinite(normalized) || Math.abs(normalized) < 0.05) {
+      return undefined;
+    }
+
+    const isSingleLine = !String(textInfo?.text || '').includes('\n');
+    const generousLimit = isSingleLine
+      ? Math.max(2.5, fontSize * 0.12)
+      : Math.max(4, fontSize * 0.18);
+
+    if (Math.abs(normalized) > generousLimit) {
+      return undefined;
+    }
+
+    return Number(normalized.toFixed(2));
   }
 
   private getRelativeRectHeight(bounds?: LanhuBounds | null): number {

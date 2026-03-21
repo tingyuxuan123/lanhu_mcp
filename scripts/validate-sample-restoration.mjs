@@ -1216,6 +1216,58 @@ function getLayoutChildren(node) {
   };
 }
 
+function isBackgroundOverlayName(name = '') {
+  const normalized = String(name || '').trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return normalized === 'bg'
+    || normalized === '背景'
+    || normalized === 'background'
+    || /(?:^|[_\s-])(bg|background)(?:$|[_\s-])/.test(normalized);
+}
+
+function isFlexBackgroundOverlayCandidate(node, child) {
+  if (!isDetachedBackgroundCandidate(node, child)) {
+    return false;
+  }
+
+  if (isBackgroundOverlayName(child.name)) {
+    return true;
+  }
+
+  const widthCoverage = child.bounds.width / Math.max(node.bounds.width, 1);
+  const heightCoverage = child.bounds.height / Math.max(node.bounds.height, 1);
+
+  return widthCoverage >= 0.96
+    && heightCoverage >= 0.78
+    && Boolean(
+      child.assetUrl
+      || child.fill
+      || child.stroke
+      || child.type === 'image'
+      || child.renderStrategy === 'asset'
+      || child.renderStrategy === 'shape'
+    );
+}
+
+function splitFlexOverlayChildren(node, overlays) {
+  const backgroundOverlays = [];
+  const foregroundOverlays = [];
+
+  for (const child of overlays) {
+    if (isFlexBackgroundOverlayCandidate(node, child)) {
+      backgroundOverlays.push(child);
+      continue;
+    }
+
+    foregroundOverlays.push(child);
+  }
+
+  return { backgroundOverlays, foregroundOverlays };
+}
+
 function getContainerChildren(node) {
   return {
     children: node.children || [],
@@ -1533,6 +1585,113 @@ function renderFlowWrapper(styles, html) {
   return `<div ${renderClassAttr('flow-wrapper', 'flow-wrapper', style)}>${html}</div>`;
 }
 
+function badgeIconTileLayout(node, children, insideMask = false) {
+  if (children.length < 3 || children.length > 4 || node.bounds.height < 72 || node.bounds.height > 132) {
+    return null;
+  }
+
+  const renderableChildren = children.filter(child => (
+    isRenderable(child)
+    && !child.clip?.isMask
+    && !child.clip?.clipped
+    && (child.text || child.children?.length || hasOwnVisual(child) || child.layoutHint)
+  ));
+  if (renderableChildren.length < 3 || renderableChildren.length > 4) {
+    return null;
+  }
+
+  const textChildren = renderableChildren.filter(child => child.text);
+  if (textChildren.length < 1 || textChildren.length > 2) {
+    return null;
+  }
+
+  const labelNode = [...textChildren]
+    .sort((left, right) => (
+      right.bounds.y + right.bounds.height - (left.bounds.y + left.bounds.height)
+      || right.bounds.width - left.bounds.width
+    ))[0];
+  if (
+    !labelNode
+    || labelNode.bounds.width < node.bounds.width * 0.72
+    || labelNode.bounds.y < node.bounds.y + node.bounds.height * 0.45
+  ) {
+    return null;
+  }
+
+  const nonLabelChildren = renderableChildren.filter(child => child.id !== labelNode.id);
+  const iconNode = nonLabelChildren.find(child => (
+    child.bounds.y + child.bounds.height <= labelNode.bounds.y + 2
+    && child.bounds.width <= node.bounds.width * 0.7
+    && child.bounds.height <= node.bounds.height * 0.7
+    && child.bounds.width >= 24
+    && child.bounds.height >= 24
+    && Math.abs(
+      (child.bounds.x + child.bounds.width / 2) - (node.bounds.x + node.bounds.width / 2),
+    ) <= Math.max(10, node.bounds.width * 0.15)
+  ));
+  if (!iconNode) {
+    return null;
+  }
+
+  const badgeNode = nonLabelChildren.find(child => (
+    child.id !== iconNode.id
+    && child.bounds.width <= Math.min(40, node.bounds.width * 0.42)
+    && child.bounds.height <= Math.min(24, node.bounds.height * 0.3)
+    && child.bounds.y <= iconNode.bounds.y + iconNode.bounds.height * 0.35
+    && child.bounds.x >= iconNode.bounds.x + iconNode.bounds.width * 0.45
+  ));
+  if (!badgeNode) {
+    return null;
+  }
+
+  const stageLeft = Math.min(iconNode.bounds.x, badgeNode.bounds.x);
+  const stageTop = Math.min(iconNode.bounds.y, badgeNode.bounds.y);
+  const stageRight = Math.max(
+    iconNode.bounds.x + iconNode.bounds.width,
+    badgeNode.bounds.x + badgeNode.bounds.width,
+  );
+  const stageBottom = Math.max(
+    iconNode.bounds.y + iconNode.bounds.height,
+    badgeNode.bounds.y + badgeNode.bounds.height,
+  );
+  const stageWidth = Number((stageRight - stageLeft).toFixed(2));
+  const stageHeight = Number((stageBottom - stageTop).toFixed(2));
+  const stageMarginTop = Number((stageTop - node.bounds.y).toFixed(2));
+  const labelMarginTop = Number((labelNode.bounds.y - stageBottom).toFixed(2));
+
+  if (stageWidth <= 0 || stageHeight <= 0 || stageMarginTop < -0.5 || labelMarginTop < -0.5) {
+    return null;
+  }
+
+  const stageHtml = [
+    renderNode(iconNode, stageLeft, stageTop, 'absolute', insideMask),
+    renderNode(badgeNode, stageLeft, stageTop, 'absolute', insideMask),
+  ].join('');
+
+  return {
+    wrapperStyles: [
+      'display:flex',
+      'flex-direction:column',
+      'align-items:center',
+      'justify-content:flex-start',
+      'box-sizing:border-box',
+    ],
+    childrenHtml: [
+      renderFlowWrapper([
+        stageMarginTop > 0 ? `margin-top:${stageMarginTop}px` : '',
+        'position:relative',
+        'flex:0 0 auto',
+        `width:${stageWidth}px`,
+        `height:${stageHeight}px`,
+      ], stageHtml),
+      renderFlowWrapper([
+        labelMarginTop > 0 ? `margin-top:${labelMarginTop}px` : '',
+        'flex:0 0 auto',
+      ], renderFlowNode(labelNode)),
+    ].join(''),
+  };
+}
+
 function toggleControlFlowLayout(node, children) {
   if (children.length < 4 || children.length > 6 || node.bounds.height > 72) {
     return null;
@@ -1664,12 +1823,15 @@ function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insi
   const detachedFlow = !simpleFlow ? detachedContainerContentLayout(node, contentChildren, insideMask) : null;
   const maskedFlow = !simpleFlow && !detachedFlow ? simpleMaskedGroupLayout(node, contentChildren) : null;
   const toggleFlow = !simpleFlow && !detachedFlow && !maskedFlow ? toggleControlFlowLayout(node, contentChildren) : null;
-  const singleFlow = !simpleFlow && !detachedFlow && !maskedFlow && !toggleFlow
+  const badgeTileFlow = !simpleFlow && !detachedFlow && !maskedFlow && !toggleFlow
+    ? badgeIconTileLayout(node, contentChildren, insideMask)
+    : null;
+  const singleFlow = !simpleFlow && !detachedFlow && !maskedFlow && !toggleFlow && !badgeTileFlow
     ? singleChildFlowLayout(node, contentChildren)
     : null;
   const wrapperVisualNode = embeddedVisualNode || maskedFlow?.visualNode || node;
   const usesAbsoluteChildren = mode === 'flow' && contentChildren.length > 0 && node.shouldRenderChildren !== false && (
-    (!simpleFlow && !maskedFlow && !toggleFlow && !singleFlow && !detachedFlow)
+    (!simpleFlow && !maskedFlow && !toggleFlow && !badgeTileFlow && !singleFlow && !detachedFlow)
     || Boolean(detachedFlow?.usesAbsoluteLayout)
   );
   const wrapperStyle = [
@@ -1686,6 +1848,7 @@ function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insi
     detachedFlow ? detachedFlow.wrapperStyles.join(';') : '',
     maskedFlow ? maskedFlow.wrapperStyles.join(';') : '',
     toggleFlow ? toggleFlow.wrapperStyles.join(';') : '',
+    badgeTileFlow ? badgeTileFlow.wrapperStyles.join(';') : '',
     singleFlow ? singleFlow.wrapperStyles.join(';') : '',
   ].filter(Boolean).join(';');
   const childrenHtml = contentChildren.length > 0 && node.shouldRenderChildren !== false
@@ -1697,6 +1860,8 @@ function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insi
           ? maskedFlow.childrenHtml
           : toggleFlow
             ? toggleFlow.childrenHtml
+          : badgeTileFlow
+            ? badgeTileFlow.childrenHtml
           : singleFlow
             ? singleFlow.childrenHtml
             : renderLayerList(contentChildren, node.bounds.x, node.bounds.y, 'absolute', insideMask)
@@ -1726,6 +1891,35 @@ function flexLayoutStyles(node, mode = 'absolute') {
   }
 
   return styles.join(';');
+}
+
+function flexOverlayGridStyles() {
+  return [
+    'display:grid',
+    'grid-template-columns:minmax(0, 1fr)',
+    'grid-template-rows:minmax(0, 1fr)',
+    'box-sizing:border-box',
+  ].join(';');
+}
+
+function flexOverlayLayerStyles(zIndex) {
+  return [
+    'grid-area:1 / 1',
+    `z-index:${zIndex}`,
+    'position:relative',
+    'min-width:0',
+    'min-height:0',
+  ].join(';');
+}
+
+function flexContentLayerStyles(node) {
+  return [
+    'grid-area:1 / 1',
+    'z-index:1',
+    'min-width:0',
+    'min-height:0',
+    flexLayoutStyles(node, 'absolute'),
+  ].filter(Boolean).join(';');
 }
 
 function toFlexJustify(value) {
@@ -1821,26 +2015,32 @@ function renderFlexNode(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
   const visualNode = getContainerVisualNode(node);
   const embeddedVisualNode = canEmbedVisualNode(node, visualNode) ? visualNode : undefined;
   const visibleOverlays = overlays.filter(child => child.id !== embeddedVisualNode?.id);
+  const { backgroundOverlays, foregroundOverlays } = splitFlexOverlayChildren(node, visibleOverlays);
+  const usesOverlayGrid = backgroundOverlays.length > 0;
   const wrapperStyle = [
     boxStyles(node, {
       offsetX,
       offsetY,
       mode,
-      positionContext: mode === 'flow' && visibleOverlays.length > 0,
+      positionContext: mode === 'flow' && (usesOverlayGrid || foregroundOverlays.length > 0),
       forceClip: false,
       visualNode: embeddedVisualNode || node,
     }),
     embeddedVisualNode ? shapeClipStyles(embeddedVisualNode, node.bounds) : '',
-    flexLayoutStyles(node, mode),
-  ].join(';');
-  const overlayHtml = visibleOverlays
-    .map(child => renderNode(child, node.bounds.x, node.bounds.y, 'absolute', false))
-    .join('\n');
-  const flowHtml = node.layoutHint?.lines?.length
+    usesOverlayGrid ? flexOverlayGridStyles() : flexLayoutStyles(node, mode),
+  ].filter(Boolean).join(';');
+  const flowContentHtml = node.layoutHint?.lines?.length
     ? renderLayoutLines(node)
     : items.map(child => renderFlowNode(child)).join('\n');
+  const backgroundHtml = usesOverlayGrid
+    ? `<div ${renderClassAttr('flex-background-layer', 'flex-background-layer', flexOverlayLayerStyles(0))}>${renderLayerList(backgroundOverlays, node.bounds.x, node.bounds.y, 'absolute', false)}</div>`
+    : '';
+  const flowHtml = usesOverlayGrid
+    ? `<div ${renderClassAttr('flex-content-layer', 'flex-content-layer', flexContentLayerStyles(node))}>${flowContentHtml}</div>`
+    : flowContentHtml;
+  const overlayHtml = renderLayerList(foregroundOverlays, node.bounds.x, node.bounds.y, 'absolute', false);
 
-  return `<div ${renderClassAttr('layer flex-node', 'flex-node', wrapperStyle)} ${layerAttrs(node)}>${overlayHtml}${flowHtml}</div>`;
+  return `<div ${renderClassAttr('layer flex-node', 'flex-node', wrapperStyle)} ${layerAttrs(node)}>${backgroundHtml}${flowHtml}${overlayHtml}</div>`;
 }
 
 function renderMaskGroup(maskNode, offsetX = 0, offsetY = 0, mode = 'absolute') {
