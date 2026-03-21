@@ -5,9 +5,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   registerCompareImagesTool,
-  registerFetchDesignTool,
-  registerParseSketchTool,
-  registerPrepareRestorationTool,
+  registerRenderHtmlBatchTool,
+  registerRenderHtmlTool,
   registerSetCookieTool,
 } from './tools/index.js';
 
@@ -17,9 +16,8 @@ export function createServer(): McpServer {
     version: '1.1.0',
   });
 
-  registerFetchDesignTool(server);
-  registerPrepareRestorationTool(server);
-  registerParseSketchTool(server);
+  registerRenderHtmlTool(server);
+  registerRenderHtmlBatchTool(server);
   registerCompareImagesTool(server);
   registerSetCookieTool(server);
 

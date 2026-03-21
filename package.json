@@ -8,7 +8,7 @@
     "lanhu-mcp": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-runtime-to-dist.mjs",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
     "restore:loop": "npm run build && node scripts/run-lanhu-loop.mjs",
@@ -35,6 +35,7 @@
     "typescript": "^5.0.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "scripts"
   ]
 }
