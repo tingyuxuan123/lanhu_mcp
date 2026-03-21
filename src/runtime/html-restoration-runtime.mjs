@@ -1399,15 +1399,33 @@ function simpleContainerContentLayout(node, children) {
   };
 }
 
+function isAssetBackedVisualNode(node) {
+  return Boolean(
+    node
+    && (
+      node.isAsset
+      || node.renderStrategy === 'asset'
+      || node.assetUrl
+    )
+  );
+}
+
 function isDetachedBackgroundCandidate(node, child) {
   if (
     !isRenderable(child)
     || child.text
     || child.clip?.isMask
     || child.clip?.clipped
-    || child.children?.length
-    || !hasOwnVisual(child)
   ) {
+    return false;
+  }
+
+  const assetBackedVisual = isAssetBackedVisualNode(child);
+  if (child.children?.length && !assetBackedVisual) {
+    return false;
+  }
+
+  if (!hasOwnVisual(child) && !assetBackedVisual) {
     return false;
   }
 
@@ -2473,12 +2491,57 @@ const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=${artboard.width}, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>${escapeHtml(artboard.name)}</title>
   <style>
-    html, body { margin: 0; padding: 0; background: #fff; }
-    body { width: ${artboard.width}px; height: ${artboard.height}px; overflow: hidden; }
-    #artboard { display:grid; grid-template-columns:minmax(0, 1fr); grid-template-rows:minmax(0, 1fr); width: ${artboard.width}px; height: ${artboard.height}px; overflow: hidden; background: #fff; }
+    :root {
+      --artboard-width: ${artboard.width};
+      --artboard-height: ${artboard.height};
+      --artboard-scale: 1;
+    }
+    html {
+      margin: 0;
+      padding: 0;
+      background: #f3f4f6;
+      overflow-x: hidden;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: #f3f4f6;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #artboard-shell {
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      box-sizing: border-box;
+      padding: env(safe-area-inset-top) 0 max(16px, env(safe-area-inset-bottom));
+      overflow-x: hidden;
+    }
+    #artboard-frame {
+      position: relative;
+      flex: 0 0 auto;
+      width: ${artboard.width}px;
+      height: ${artboard.height}px;
+      max-width: 100vw;
+    }
+    #artboard {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      width: ${artboard.width}px;
+      height: ${artboard.height}px;
+      overflow: hidden;
+      background: #fff;
+      transform: scale(var(--artboard-scale));
+      transform-origin: top left;
+    }
     .layer { box-sizing: border-box; }
     .text { -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; user-select: text; }
     #artboard img, #artboard svg, #artboard path { pointer-events: none; }
@@ -2486,7 +2549,33 @@ ${generatedCss}
   </style>
 </head>
 <body>
-  <div id="artboard">${renderedRoot}</div>
+  <div id="artboard-shell">
+    <div id="artboard-frame">
+      <div id="artboard">${renderedRoot}</div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const designWidth = ${artboard.width};
+      const designHeight = ${artboard.height};
+      const root = document.documentElement;
+      const frame = document.getElementById('artboard-frame');
+
+      const applyScale = () => {
+        const viewportWidth = Math.max(320, root.clientWidth || window.innerWidth || designWidth);
+        const scale = Math.min(1, viewportWidth / designWidth);
+        root.style.setProperty('--artboard-scale', String(scale));
+
+        if (frame) {
+          frame.style.width = \`\${designWidth * scale}px\`;
+          frame.style.height = \`\${designHeight * scale}px\`;
+        }
+      };
+
+      applyScale();
+      window.addEventListener('resize', applyScale, { passive: true });
+    })();
+  </script>
 </body>
 </html>`;
 
