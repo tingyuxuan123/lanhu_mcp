@@ -1,51 +1,74 @@
-# Database Guidelines
+# External Services & Data
 
-> Database patterns and conventions for this project.
-
----
-
-## Overview
-
-<!--
-Document your project's database conventions here.
-
-Questions to answer:
-- What ORM/query library do you use?
-- How are migrations managed?
-- What are the naming conventions for tables/columns?
-- How do you handle transactions?
--->
-
-(To be filled by the team)
+> This project has **no database**. This file documents external service interaction patterns instead.
 
 ---
 
-## Query Patterns
+## Lanhu API
 
-<!-- How should queries be written? Batch operations? -->
+**Client:** `src/services/lanhu-client.ts` — `LanhuClient` class
 
-(To be filled by the team)
+**Base URL:** `https://lanhuapp.com`
+
+**Authentication:** Cookie-based, managed by `src/config/cookie-manager.ts` (singleton)
+
+**Key endpoints:**
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/project/image` | GET | Fetch design info (project_id, image_id) |
+| `/api/account/user_settings` | GET | Resolve team_id from user settings |
+| Sketch JSON URL | GET | Fetch raw design data (from `json_url`) |
+
+**Request pattern:**
+- All requests go through `LanhuClient.request<T>()` (private method)
+- Timeout: 30 seconds via `AbortSignal.timeout()`
+- Response validation: check `code === '00000'` for success
+- JSON parse with fallback error handling
+
+**Cookie management:**
+- `cookieManager.setCookie(value)` — store for subsequent requests
+- `cookieManager.getCookie(override?)` — get stored or override
+- Cookies are passed via tool params or from prior `lanhu_set_cookie` call
 
 ---
 
-## Migrations
+## Asset Downloads
 
-<!-- How to create and run migrations -->
+**Service:** `src/services/asset-localizer.ts` — `AssetLocalizer`
 
-(To be filled by the team)
+**Pattern:**
+1. Collect all `assetUrl` references from parsed layers
+2. Download each with retry logic (`downloadWithRetry`)
+3. Compute SHA1 content hash for deduplication
+4. Detect file extension from buffer + Content-Type
+5. Write to local directory with slug-based names
+6. Return asset manifest with local paths
+
+**Deduplication:** By SHA1 hash — identical content only downloaded/written once.
 
 ---
 
-## Naming Conventions
+## Playwright (Screenshot)
 
-<!-- Table names, column names, index names -->
+**Used by:** `html-restoration-runtime.mjs` for headless screenshots
 
-(To be filled by the team)
+**Pattern:**
+- Launch Chromium headless
+- Set viewport to design dimensions (1:1 pixel mapping)
+- Navigate to `file://` HTML path
+- Screenshot `#artboard` element only
+- Used for visual diff comparison
 
 ---
 
-## Common Mistakes
+## File System
 
-<!-- Database-related mistakes your team has made -->
+**Key directories:**
 
-(To be filled by the team)
+| Path | Purpose |
+|------|---------|
+| Output dir (configurable) | HTML/SFC files, screenshots, diffs |
+| `<output>/lanhu-restoration-assets/` | Localized image assets |
+
+**File I/O:** Always uses `node:fs/promises` (async). Never sync file operations.

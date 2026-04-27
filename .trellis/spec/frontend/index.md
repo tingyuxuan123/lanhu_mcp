@@ -1,12 +1,17 @@
-# Frontend Development Guidelines
+# Frontend / Runtime Guidelines
 
-> Best practices for frontend development in this project.
+> Runtime engines, rendering output, and type system conventions for this MCP Server project.
 
 ---
 
 ## Overview
 
-This directory contains guidelines for frontend development. Fill in each file with your project's specific conventions.
+This project has **no traditional frontend UI**. The "frontend" specs are repurposed to document:
+- Runtime rendering engines and output structure
+- TypeScript type system conventions
+- Rendering quality and verification
+
+Three files are marked **N/A** (component, hooks, state management) — this project has no frontend framework.
 
 ---
 
@@ -14,26 +19,13 @@ This directory contains guidelines for frontend development. Fill in each file w
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
-| [Component Guidelines](./component-guidelines.md) | Component patterns, props, composition | To fill |
-| [Hook Guidelines](./hook-guidelines.md) | Custom hooks, data fetching patterns | To fill |
-| [State Management](./state-management.md) | Local state, global state, server state | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
-| [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
+| [Runtime & Output Structure](./directory-structure.md) | Runtime engines, output files, scripts | ✅ Filled |
+| [Component Guidelines](./component-guidelines.md) | N/A — no frontend components | N/A |
+| [Hook Guidelines](./hook-guidelines.md) | N/A — no React hooks | N/A |
+| [State Management](./state-management.md) | N/A — no frontend state | N/A |
+| [Quality Guidelines](./quality-guidelines.md) | Rendering quality, visual fidelity, regression checks | ✅ Filled |
+| [Type Safety](./type-safety.md) | Type organization, SimplifiedLayer, Zod validation | ✅ Filled |
 
 ---
 
-## How to Fill These Guidelines
-
-For each guideline file:
-
-1. Document your project's **actual conventions** (not ideals)
-2. Include **code examples** from your codebase
-3. List **forbidden patterns** and why
-4. Add **common mistakes** your team has made
-
-The goal is to help AI assistants and new team members understand how YOUR project works.
-
----
-
-**Language**: All documentation should be written in **English**.
+**Language**: All documentation is written in **English**.
