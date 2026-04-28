@@ -421,8 +421,10 @@ test('renderUniAppRoot does not emit background fills for asset-backed image nod
     designWidth: 375,
   });
 
-  assert.match(sfc, /<image class="icon-node box-node absolute-node image-node" data-node-id="4" data-node-role="icon-node" data-node-name="trend icon" src="\/static\/lanhu-assets\/icon-down.png" mode="aspectFill" \/>/);
-  assert.match(sfc, /\.icon-node \{[^}]*border-radius: 4rpx;/);
+  assert.match(sfc, /<image class="icon-node icon-node-\d+ box-node absolute-node image-node" data-node-id="4" data-node-role="icon-node" data-node-name="trend icon" src="\/static\/lanhu-assets\/icon-down.png" mode="aspectFill" \/>/);
+  assert.match(sfc, /\.icon-node-\d+ \{[^}]*border-radius: 4rpx;/);
+  assert.doesNotMatch(sfc, /\.icon-node \{[^}]*width:/);
+  assert.doesNotMatch(sfc, /\.icon-node \{[^}]*height:/);
   assert.doesNotMatch(sfc, /\.icon-node \{[^}]*background-color:/);
   assert.doesNotMatch(sfc, /\.icon-node \{[^}]*background-image:/);
 });

@@ -29,6 +29,24 @@ export interface UniAppRenderModel {
 }
 
 const SECTION_NAME_PATTERNS = /菜单|数据|通知|公告|推荐|车源|标签栏|footer|tab|banner|快捷/i;
+const RESERVED_UTILITY_CLASS_NAMES = new Set([
+  'absolute-node',
+  'box-node',
+  'divider-node',
+  'flow-node',
+  'group-node',
+  'icon-node',
+  'image-node',
+  'layout-column',
+  'layout-row',
+  'media-node',
+  'page-content',
+  'section',
+  'section-item',
+  'section-row',
+  'text-node',
+  'text-node-role',
+]);
 
 export function buildUniAppRenderModel(
   nodes: SimplifiedLayer[],
@@ -919,7 +937,7 @@ function compareSpacing(left: SimplifiedSpacing | undefined, right: SimplifiedSp
 function allocateClassName(baseClass: string, classUsage: Map<string, number>): string {
   const nextCount = (classUsage.get(baseClass) || 0) + 1;
   classUsage.set(baseClass, nextCount);
-  return nextCount === 1
+  return nextCount === 1 && !RESERVED_UTILITY_CLASS_NAMES.has(baseClass)
     ? baseClass
     : `${baseClass}-${nextCount}`;
 }
