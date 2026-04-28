@@ -15,6 +15,7 @@ This project is a **MCP Server** (Node.js TypeScript) — not a traditional REST
 | Guide | Description | Status |
 |-------|-------------|--------|
 | [Directory Structure](./directory-structure.md) | Module organization, file layout, entry points | ✅ Filled |
+| [Render Tool Contracts](./render-tool-contracts.md) | MCP render tool signatures, payloads, env keys | ✅ Filled |
 | [Database Guidelines](./database-guidelines.md) | External services & data (Lanhu API, assets, file I/O) | ✅ Filled |
 | [Error Handling](./error-handling.md) | LanhuMcpError hierarchy, MCP tool error pattern | ✅ Filled |
 | [Quality Guidelines](./quality-guidelines.md) | TypeScript config, testing, naming, forbidden patterns | ✅ Filled |

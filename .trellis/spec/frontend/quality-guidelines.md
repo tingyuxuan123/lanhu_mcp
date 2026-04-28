@@ -6,7 +6,7 @@
 
 ## Overview
 
-The project generates HTML (and potentially SFC) files from Lanhu design data. Quality is measured by visual fidelity — how closely the output matches the original design.
+The project generates HTML and UniApp SFC files from Lanhu design data. Quality is measured by visual fidelity and delivery integrity — the output must both look correct and be directly consumable by downstream projects.
 
 ---
 
@@ -34,6 +34,9 @@ The `lanhu_compare_images` tool provides automated visual diff:
 - [ ] Opacity/transparency is correct
 - [ ] Gradients render correctly
 - [ ] Shadow effects are visible
+- [ ] UniApp output uses `rpx` sizing derived from `design_width`
+- [ ] UniApp asset URLs point to the configured public path prefix
+- [ ] Rich text segments preserve mixed font sizes/weights instead of flattening to one style
 
 ---
 
@@ -43,7 +46,7 @@ These are accepted limitations — not bugs:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| SVG complex paths | Partial | Rendered as SVG inline; may not work in all contexts |
+| SVG complex paths | Partial | HTML may use inline SVG; UniApp falls back to data-URI image for complex geometry |
 | Blend modes | Limited | Most blend modes map to CSS equivalents |
 | Adjustment layers | Limited | Blur/brightness may not fully replicate |
 | Text overflow | Approximate | Multi-line text wrapping may differ |
@@ -70,12 +73,15 @@ If a new pattern is needed, add detection logic in the runtime's `renderContaine
 When making changes to the rendering pipeline:
 
 1. Run `npm run validate:sample` to verify sample output
-2. Compare screenshots before/after the change
-3. Check that similarity score does not decrease
-4. Verify no new visual regressions in:
+2. Run `npm test` to verify renderer/service contracts
+3. For UniApp, run a smoke generation against `tmp_sample.json`
+4. Compare screenshots before/after the change when HTML output changes
+5. Check that similarity score does not decrease when HTML output changes
+6. Verify no new visual regressions in:
    - Text rendering
    - Layout positioning
    - Asset loading
    - Shadow/gradient effects
+   - SFC structure (`<template>`, `<script>`, `<style scoped>`)
 
 (To be filled by the team)

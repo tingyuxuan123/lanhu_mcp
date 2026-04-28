@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Module organization, file layout conventions"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Error handling patterns for MCP tools"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "TypeScript conventions, forbidden patterns, testing"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Logging patterns and constraints"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Type system conventions, SimplifiedLayer"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Rendering quality standards, regression checks"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Runtime engine structure, output organization"}

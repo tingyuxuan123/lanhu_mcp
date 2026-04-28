@@ -7,6 +7,7 @@ import {
   registerCompareImagesTool,
   registerRenderHtmlBatchTool,
   registerRenderHtmlTool,
+  registerRenderUniAppTool,
   registerSetCookieTool,
 } from './tools/index.js';
 
@@ -17,6 +18,7 @@ export function createServer(): McpServer {
   });
 
   registerRenderHtmlTool(server);
+  registerRenderUniAppTool(server);
   registerRenderHtmlBatchTool(server);
   registerCompareImagesTool(server);
   registerSetCookieTool(server);

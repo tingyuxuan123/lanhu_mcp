@@ -6,12 +6,12 @@
 
 ## Runtime Engines
 
-Runtime engines are `.mjs` files in `src/runtime/` that perform the actual HTML rendering. They are **not TypeScript** and are loaded dynamically via `import()`.
+Runtime engines are `.mjs` files in `src/runtime/` that perform the actual rendering. They are **not TypeScript** and are loaded dynamically via `import()`.
 
 ```
 src/runtime/
-├── html-restoration-runtime.mjs     # HTML rendering engine (main)
-└── (future: uniapp-restoration-runtime.mjs, etc.)
+├── html-restoration-runtime.mjs      # HTML rendering engine
+└── uniapp-restoration-runtime.mjs    # UniApp SFC rendering engine
 ```
 
 **Why separate MJS files?**
@@ -19,7 +19,7 @@ src/runtime/
 - Cannot import TypeScript modules at runtime
 - Copied to `dist/runtime/` during build by `scripts/copy-runtime-to-dist.mjs`
 
-**Runtime entry point:**
+**Runtime entry points:**
 ```javascript
 export async function runHtmlRestoration(options = {}) {
   // 1. Load dependencies (LanhuClient, LanhuParser, AssetLocalizer)
@@ -29,6 +29,15 @@ export async function runHtmlRestoration(options = {}) {
   // 5. Render HTML
   // 6. Screenshot → compare → handoff package
   return { source, artboard, restoration, localizedAssets, htmlPath, ... };
+}
+
+export async function runUniAppRestoration(options = {}) {
+  // 1. Load dependencies (LanhuClient, LanhuParser, AssetLocalizer, renderUniAppRoot)
+  // 2. Fetch/load design document
+  // 3. Parse → build layer tree → localize assets
+  // 4. Render a static UniApp single-file component
+  // 5. Write .vue + metadata + bundle files
+  return { source, artboard, designWidth, localizedAssets, vuePath, ... };
 }
 ```
 
@@ -49,6 +58,19 @@ Each `lanhu_render_html` call produces an output directory:
     └── ...
 ```
 
+Each `lanhu_render_uniapp` call produces an output directory:
+
+```
+<output_dir>/
+├── <prefix>.vue                           # Static UniApp single-file component
+├── <prefix>-meta.json                     # Runtime output metadata
+├── <prefix>-bundle.json                   # Parsed design bundle used to render SFC
+└── <prefix>-assets/                       # Localized image assets
+  ├── icon-abc12345.png
+  ├── banner-def67890.jpg
+  └── ...
+```
+
 ---
 
 ## Script Files
@@ -56,7 +78,6 @@ Each `lanhu_render_html` call produces an output directory:
 ```
 scripts/
 ├── copy-runtime-to-dist.mjs    # Copies runtime/*.mjs to dist/runtime/ during build
-├── html-restoration-runtime.mjs # Copy of runtime engine (for standalone use)
 ├── run-lanhu-loop.mjs           # Batch restoration loop script
 └── validate-sample-restoration.mjs # Sample validation script
 ```
@@ -72,6 +93,8 @@ tests/
 ├── html-restoration-batch-runner.test.mjs
 ├── lanhu-client.test.mjs
 ├── lanhu-parser.test.mjs
+├── uniapp-handoff.test.mjs
+├── uniapp-renderer.test.mjs
 └── url-parser.test.mjs
 ```
 

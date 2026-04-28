@@ -2,24 +2,24 @@
 
 蓝湖设计还原 MCP。
 
-当前仓库的对外定位已经收口为一件事：
+当前仓库现在支持两条交付链路：
 
 - 输入蓝湖页面 URL 或 `json_url`
-- 输出高保真 HTML 页面
-- 同时落地对应图片资源
-- 可选输出预览图、diff 图和相似度分数
+- 输出高保真 HTML 页面 + 图片资源
+- 或直接输出静态 UniApp SFC + 图片资源
 
-这个 MCP 不负责直接生成 uniapp、微信小程序、React、Vue 页面代码。
-它只负责把设计稿交付成 `HTML + 图片资源`，下游项目再根据 HTML 自己重构成目标界面。
+其中 HTML 交付物仍然适合下游二次重构；UniApp 工具则适合直接生成首版 `.vue` 页面骨架。
 
 ## 当前能力
 
-当前默认暴露的 MCP 工具只有 4 个：
+当前默认暴露的 MCP 工具有 5 个：
 
 - `lanhu_set_cookie`
   - 设置蓝湖登录 Cookie
 - `lanhu_render_html`
   - 单页输出 HTML 交付物
+- `lanhu_render_uniapp`
+  - 单页输出静态 UniApp SFC 交付物
 - `lanhu_render_batch`
   - 批量输出 HTML 交付物并生成验收 summary
 - `lanhu_compare_images`
@@ -31,9 +31,9 @@
 
 1. 设计在蓝湖里
 2. 通过 MCP 拉取页面
-3. 生成 HTML 和图片资源
+3. 选择生成 HTML 或 UniApp SFC 以及图片资源
 4. 交给别的项目或别的 Agent
-5. 对方根据 HTML 自己重构成：
+5. 对方根据交付物继续重构或直接落地：
    - uniapp
    - 微信小程序
    - React
@@ -183,6 +183,62 @@ npm run restore:loop
 你真正需要交给下游项目的就是：
 
 - `htmlPath`
+- `assetDirectory`
+- `assetFiles`
+
+### `lanhu_render_uniapp`
+
+把一个蓝湖页面或 `json_url` 直接还原成静态 UniApp 单文件组件。
+
+输入：
+
+```json
+{
+  "json_url": "https://alipic.lanhuapp.com/...",
+  "output_dir": "artifacts/uniapp-page",
+  "output_prefix": "profile-page",
+  "design_width": 375,
+  "asset_public_path": "/static/lanhu-assets"
+}
+```
+
+输出格式为 `uniapp-sfc-assets`：
+
+```json
+{
+  "success": true,
+  "data": {
+    "mode": "uniapp-sfc-assets",
+    "source": {
+      "jsonUrl": "...",
+      "referenceImageUrl": "..."
+    },
+    "vuePath": "E:/project/.../profile-page.vue",
+    "bundlePath": "E:/project/.../profile-page-bundle.json",
+    "metaPath": "E:/project/.../profile-page-meta.json",
+    "designWidth": 375,
+    "artboard": {
+      "name": "Profile",
+      "width": 375,
+      "height": 812
+    },
+    "assetDirectory": "E:/project/.../profile-page-assets",
+    "assetPublicPathPrefix": "/static/lanhu-assets",
+    "assetFiles": [
+      {
+        "fileName": "icon-user.png",
+        "localPath": "/static/lanhu-assets/icon-user.png",
+        "filePath": "E:/project/.../icon-user.png",
+        "sourceUrl": "https://..."
+      }
+    ]
+  }
+}
+```
+
+你真正需要交给下游项目的就是：
+
+- `vuePath`
 - `assetDirectory`
 - `assetFiles`
 
