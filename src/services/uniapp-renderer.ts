@@ -359,7 +359,12 @@ function renderFlexLines(node: SimplifiedLayer, flowChildren: SimplifiedLayer[],
       const declarations = [
         'width: 100%',
       ];
-      if (typeof line.gap === 'number' && line.gap > 0) {
+      if (
+        line.justifyContent !== 'space-between'
+        && typeof line.gap === 'number'
+        && Number.isFinite(line.gap)
+        && line.gap > 0
+      ) {
         declarations.push(`column-gap: ${pxToRpx(line.gap, context.state.designWidth)}`);
       }
       if (line.justifyContent) {
@@ -490,7 +495,12 @@ function applyFlexDeclarations(declarations: string[], layoutHint: SimplifiedLay
     return;
   }
 
-  if (typeof layoutHint.gap === 'number' && layoutHint.gap > 0) {
+  if (
+    layoutHint.justifyContent !== 'space-between'
+    && typeof layoutHint.gap === 'number'
+    && Number.isFinite(layoutHint.gap)
+    && layoutHint.gap > 0
+  ) {
     declarations.push(`gap: ${pxToRpx(layoutHint.gap, designWidth)}`);
   }
   if (layoutHint.padding) {
@@ -528,9 +538,11 @@ function applyTextDeclarations(declarations: string[], textStyle: SimplifiedText
 }
 
 function applyTextLayoutDeclarations(declarations: string[], node: SimplifiedLayer): void {
-  const singleLine = isSingleLineText(node.text || '');
-  declarations.push(`white-space: ${singleLine ? 'nowrap' : 'pre-wrap'}`);
-  declarations.push(`word-break: ${singleLine ? 'keep-all' : 'break-word'}`);
+  const contentSizedPointText = node.sizeHint?.width === 'content'
+    && node.textMetrics?.frameKind !== 'paragraph'
+    && isSingleLineText(node.text || '');
+  declarations.push(`white-space: ${contentSizedPointText ? 'nowrap' : 'pre-wrap'}`);
+  declarations.push(`word-break: ${contentSizedPointText ? 'keep-all' : 'break-word'}`);
 }
 
 function buildTextSegments(node: SimplifiedLayer, state: RenderState): TextSegment[] {

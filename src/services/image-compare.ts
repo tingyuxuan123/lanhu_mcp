@@ -2,6 +2,10 @@
 import { dirname, resolve } from 'node:path';
 import { Jimp, diff as jimpDiff, intToRGBA } from 'jimp';
 
+type LoadedImage = Awaited<ReturnType<typeof Jimp.read>>;
+
+const MAX_ASPECT_RATIO_RELATIVE_ERROR = 0.01;
+
 export interface CompareImagesParams {
   referenceImageUrl?: string;
   referenceImagePath?: string;
@@ -38,6 +42,20 @@ export interface CompareImagesResult {
   diffImagePath?: string;
 }
 
+export class ImageAspectRatioMismatchError extends Error {
+  readonly code = 'IMAGE_ASPECT_RATIO_MISMATCH';
+
+  constructor(
+    public readonly referenceSize: { width: number; height: number },
+    public readonly candidateSize: { width: number; height: number },
+  ) {
+    super(
+      `Reference and candidate aspect ratios do not match: ${referenceSize.width}x${referenceSize.height} versus ${candidateSize.width}x${candidateSize.height}`,
+    );
+    this.name = 'ImageAspectRatioMismatchError';
+  }
+}
+
 export class ImageCompareService {
   async compare(params: CompareImagesParams): Promise<CompareImagesResult> {
     const referenceSource = params.referenceImageUrl || params.referenceImagePath;
@@ -59,10 +77,20 @@ export class ImageCompareService {
       height: candidateOriginal.bitmap.height,
     };
 
-    let candidate = candidateOriginal.clone();
+    if (!this.haveCompatibleAspectRatios(
+      { width: referenceWidth, height: referenceHeight },
+      originalCandidateSize,
+    )) {
+      throw new ImageAspectRatioMismatchError(
+        { width: referenceWidth, height: referenceHeight },
+        originalCandidateSize,
+      );
+    }
+
+    const candidate = candidateOriginal;
     let resizedCandidate = false;
     if ((candidate.bitmap.width !== referenceWidth || candidate.bitmap.height !== referenceHeight) && (params.resizeCandidate ?? true)) {
-      candidate = candidate.resize({ w: referenceWidth, h: referenceHeight });
+      candidate.resize({ w: referenceWidth, h: referenceHeight });
       resizedCandidate = true;
     }
 
@@ -102,7 +130,7 @@ export class ImageCompareService {
     };
   }
 
-  private async loadImage(source: string): Promise<any> {
+  private async loadImage(source: string): Promise<LoadedImage> {
     if (/^https?:\/\//i.test(source)) {
       const response = await fetch(source, {
         headers: {
@@ -122,7 +150,17 @@ export class ImageCompareService {
     return Jimp.read(resolve(source));
   }
 
-  private analyzePixels(reference: any, candidate: any, mismatchThreshold: number, gridRows: number, gridCols: number) {
+  private haveCompatibleAspectRatios(
+    referenceSize: { width: number; height: number },
+    candidateSize: { width: number; height: number },
+  ): boolean {
+    const referenceRatio = referenceSize.width / referenceSize.height;
+    const candidateRatio = candidateSize.width / candidateSize.height;
+    const relativeError = Math.abs(referenceRatio - candidateRatio) / Math.max(referenceRatio, candidateRatio);
+    return Number.isFinite(relativeError) && relativeError <= MAX_ASPECT_RATIO_RELATIVE_ERROR;
+  }
+
+  private analyzePixels(reference: LoadedImage, candidate: LoadedImage, mismatchThreshold: number, gridRows: number, gridCols: number) {
     const width = reference.bitmap.width;
     const height = reference.bitmap.height;
     const tiles = Array.from({ length: gridRows * gridCols }, () => ({
@@ -202,7 +240,7 @@ export class ImageCompareService {
     };
   }
 
-  private getPixelWeight(image: any, x: number, y: number) {
+  private getPixelWeight(image: LoadedImage, x: number, y: number) {
     const center = this.getLuminance(intToRGBA(image.getPixelColor(x, y)));
     const right = this.getLuminance(intToRGBA(image.getPixelColor(Math.min(image.bitmap.width - 1, x + 1), y)));
     const bottom = this.getLuminance(intToRGBA(image.getPixelColor(x, Math.min(image.bitmap.height - 1, y + 1))));
@@ -249,7 +287,7 @@ export class ImageCompareService {
         suggestions.push('底部区域差异明显，优先检查 TabBar、高亮态和底部留白。');
       }
       if (mismatchBounds.width > width * 0.85 && mismatchBounds.height > height * 0.85) {
-      suggestions.push('差异覆盖几乎整张图，通常是整体缩放、主背景色或容器宽高不一致。');
+        suggestions.push('差异覆盖几乎整张图，通常是整体缩放、主背景色或容器宽高不一致。');
       }
     }
 
@@ -266,4 +304,3 @@ export class ImageCompareService {
 }
 
 export const imageCompareService = new ImageCompareService();
-

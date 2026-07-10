@@ -15,6 +15,7 @@ import type {
   LanhuFill,
   LanhuGradientFill,
   LanhuLayer,
+  LanhuTextBounds,
   RestorationPlan,
   SimplifiedFill,
   SimplifiedGradient,
@@ -26,6 +27,7 @@ import type {
   SimplifiedTextStyleRange,
   TextLayerSummary,
 } from '../types/lanhu.js';
+import { normalizeFiniteNumber } from '../utils/finite-number.js';
 import { logger } from '../utils/logger.js';
 
 export class LanhuParser {
@@ -283,7 +285,15 @@ export class LanhuParser {
   }
 
   private getSizeHint(node: SimplifiedLayer): SimplifiedLayer['sizeHint'] {
-    if (node.text || node.isTextOnlyContainer) {
+    if (node.text) {
+      const useContentSizing = this.hasPointTextSizingEvidence(node);
+      return {
+        width: useContentSizing ? 'content' : 'fixed',
+        height: useContentSizing ? 'content' : 'fixed',
+      };
+    }
+
+    if (node.isTextOnlyContainer) {
       return {
         width: 'content',
         height: 'content',
@@ -294,6 +304,39 @@ export class LanhuParser {
       width: 'fixed',
       height: 'fixed',
     };
+  }
+
+  private hasPointTextSizingEvidence(node: SimplifiedLayer): boolean {
+    const text = String(node.text || '');
+    const metrics = node.textMetrics;
+    if (metrics?.frameKind === 'paragraph' || text.includes('\n')) {
+      return false;
+    }
+
+    if (metrics?.frameKind === 'point') {
+      return true;
+    }
+
+    const frame = metrics?.relativeBounds;
+    const inkBounds = metrics?.relativeBoundingBox;
+    if (!frame || !inkBounds || frame.width <= 0 || inkBounds.width <= 0) {
+      return false;
+    }
+
+    const fontSize = node.textStyle?.fontSize || 14;
+    const lineHeight = node.textStyle?.lineHeight || fontSize * 1.2;
+    const horizontalFrameSlack = frame.width - inkBounds.width;
+    const hasFramedAlignment = (
+      node.textStyle?.alignment === 'center'
+      || node.textStyle?.alignment === 'right'
+    ) && horizontalFrameSlack > Math.max(2, fontSize * 0.12);
+    const appearsWrapped = inkBounds.height > lineHeight * 1.35;
+
+    if (hasFramedAlignment || appearsWrapped) {
+      return false;
+    }
+
+    return Math.abs(horizontalFrameSlack) <= Math.max(2, fontSize * 0.12);
   }
 
   private isTextOnlyContainer(node: SimplifiedLayer): boolean {
@@ -348,7 +391,7 @@ export class LanhuParser {
       .filter((layout): layout is NonNullable<typeof layout> => layout !== null)
       .sort((left, right) => right.score - left.score)[0];
 
-    if (chosen && chosen.score >= 1.2) {
+    if (chosen && chosen.score >= Math.max(3, items.length * 0.8)) {
       return {
         mode: chosen.direction === 'row' ? 'flex-row' : 'flex-column',
         itemIds: chosen.items.map(item => item.id),
@@ -464,6 +507,16 @@ export class LanhuParser {
       return null;
     }
 
+    const allChildrenInsideContainer = children.every(child => (
+      child.bounds.x >= node.bounds.x
+      && child.bounds.y >= node.bounds.y
+      && child.bounds.x + child.bounds.width <= node.bounds.x + node.bounds.width
+      && child.bounds.y + child.bounds.height <= node.bounds.y + node.bounds.height
+    ));
+    if (!allChildrenInsideContainer) {
+      return null;
+    }
+
     const ordered = [...children].sort((left, right) => (
       direction === 'row'
         ? left.bounds.x - right.bounds.x || left.bounds.y - right.bounds.y
@@ -471,7 +524,6 @@ export class LanhuParser {
     ));
 
     const gaps: number[] = [];
-    let overlapPenalty = 0;
 
     for (let index = 1; index < ordered.length; index += 1) {
       const previous = ordered[index - 1];
@@ -481,11 +533,10 @@ export class LanhuParser {
         : previous.bounds.y + previous.bounds.height;
       const currentStart = direction === 'row' ? current.bounds.x : current.bounds.y;
       const gap = currentStart - previousEnd;
-      if (gap >= 0) {
-        gaps.push(gap);
-      } else {
-        overlapPenalty += Math.abs(gap);
+      if (gap < 0) {
+        return null;
       }
+      gaps.push(gap);
     }
 
     const crossCenters = ordered.map(item => (
@@ -502,13 +553,6 @@ export class LanhuParser {
       return null;
     }
 
-    const mainOverlapLimit = direction === 'row'
-      ? node.bounds.width * 0.08
-      : node.bounds.height * 0.08;
-    if (overlapPenalty > mainOverlapLimit) {
-      return null;
-    }
-
     const contentBounds = this.getBoundingBounds(ordered);
     const padding = {
       left: Number((contentBounds.x - node.bounds.x).toFixed(2)),
@@ -518,42 +562,75 @@ export class LanhuParser {
     };
 
     const gap = gaps.length > 0 ? Number(this.median(gaps).toFixed(2)) : 0;
-    const leading = direction === 'row' ? padding.left : padding.top;
-    const trailing = direction === 'row' ? padding.right : padding.bottom;
-    const justifyContent = gap > 0
-      && gaps.length === ordered.length - 1
-      && Math.abs(leading - trailing) <= Math.max(12, gap * 1.2)
-      && this.getVariance(gaps) <= Math.max(16, gap * 1.2)
-      ? 'space-between'
-      : 'start';
+    const mainAxisSize = direction === 'row' ? node.bounds.width : node.bounds.height;
+    const coordinateTolerance = Math.max(1.5, Math.min(3, mainAxisSize * 0.005));
+    const largestGapError = Math.max(...gaps.map(value => Math.abs(value - gap)), 0);
+    if (largestGapError > coordinateTolerance) {
+      return null;
+    }
 
-    const topOrLeftValues = ordered.map(item => direction === 'row' ? item.bounds.y : item.bounds.x);
-    const endValues = ordered.map(item => direction === 'row'
-      ? item.bounds.y + item.bounds.height
-      : item.bounds.x + item.bounds.width);
-    const startSpread = Math.max(...topOrLeftValues) - Math.min(...topOrLeftValues);
-    const endSpread = Math.max(...endValues) - Math.min(...endValues);
-    const alignItems = crossSpread <= Math.max(8, averageCrossSize * 0.45)
-      ? 'center'
-      : startSpread <= endSpread
-        ? 'start'
-        : 'end';
+    const crossAlignment = this.measureCrossAxisAlignment(ordered, contentBounds, direction);
+    if (!crossAlignment || crossAlignment.error > coordinateTolerance) {
+      return null;
+    }
 
     const coverage = direction === 'row'
       ? contentBounds.width / Math.max(node.bounds.width, 1)
       : contentBounds.height / Math.max(node.bounds.height, 1);
-    const score = Number((children.length + coverage * 1.5 - overlapPenalty / 20 - crossSpread / Math.max(averageCrossSize, 1)).toFixed(2));
+    const normalizedGeometryPenalty = (
+      largestGapError / coordinateTolerance
+      + crossAlignment.error / coordinateTolerance
+    ) * 0.5;
+    const score = Number((children.length + coverage * 1.5 - normalizedGeometryPenalty).toFixed(2));
 
     return {
       direction,
       items: ordered,
       gap,
       padding,
-      justifyContent,
-      alignItems,
+      justifyContent: 'start',
+      alignItems: crossAlignment.alignment,
       contentBounds,
       score,
     };
+  }
+
+  private measureCrossAxisAlignment(
+    items: SimplifiedLayer[],
+    contentBounds: SimplifiedLayer['bounds'],
+    direction: 'row' | 'column',
+  ): { alignment: 'start' | 'center' | 'end'; error: number } | null {
+    if (items.length === 0) {
+      return null;
+    }
+
+    const contentStart = direction === 'row' ? contentBounds.y : contentBounds.x;
+    const contentSize = direction === 'row' ? contentBounds.height : contentBounds.width;
+    const measurements = items.map(item => {
+      const start = direction === 'row' ? item.bounds.y : item.bounds.x;
+      const size = direction === 'row' ? item.bounds.height : item.bounds.width;
+      return { start, size };
+    });
+    const candidates: Array<{ alignment: 'start' | 'center' | 'end'; error: number }> = [
+      {
+        alignment: 'start',
+        error: Math.max(...measurements.map(item => Math.abs(item.start - contentStart))),
+      },
+      {
+        alignment: 'center',
+        error: Math.max(...measurements.map(item => Math.abs(
+          item.start + item.size / 2 - (contentStart + contentSize / 2),
+        ))),
+      },
+      {
+        alignment: 'end',
+        error: Math.max(...measurements.map(item => Math.abs(
+          item.start + item.size - (contentStart + contentSize),
+        ))),
+      },
+    ];
+
+    return candidates.sort((left, right) => left.error - right.error)[0];
   }
 
   private measureStackedRowsLayout(
@@ -608,11 +685,16 @@ export class LanhuParser {
       return {
         items: ordered,
         bounds,
+        preservesSourceGeometry: ordered.length === 1 || rowLayout !== null,
         gap: rowLayout?.gap || 0,
         justifyContent: rowLayout?.justifyContent || 'start',
         alignItems: rowLayout?.alignItems || 'start',
       };
     });
+
+    if (rowMetadata.some(line => !line.preservesSourceGeometry)) {
+      return null;
+    }
 
     for (let index = 1; index < rowMetadata.length; index += 1) {
       const previous = rowMetadata[index - 1];
@@ -1115,18 +1197,33 @@ export class LanhuParser {
     };
   }
 
-  private toRelativeRect(bounds?: LanhuBounds | null) {
+  private toRelativeRect(bounds?: LanhuTextBounds | null) {
     if (!bounds) {
       return undefined;
     }
 
+    const left = normalizeFiniteNumber(bounds.left);
+    const top = normalizeFiniteNumber(bounds.top);
+    const right = normalizeFiniteNumber(bounds.right);
+    const bottom = normalizeFiniteNumber(bounds.bottom);
+    if (
+      left === undefined
+      || top === undefined
+      || right === undefined
+      || bottom === undefined
+      || right < left
+      || bottom < top
+    ) {
+      return undefined;
+    }
+
     return {
-      left: bounds.left,
-      top: bounds.top,
-      right: bounds.right,
-      bottom: bounds.bottom,
-      width: bounds.right - bounds.left,
-      height: bounds.bottom - bounds.top,
+      left,
+      top,
+      right,
+      bottom,
+      width: right - left,
+      height: bottom - top,
     };
   }
 
@@ -1152,7 +1249,13 @@ export class LanhuParser {
     }
 
     const firstStyle = textInfo.textStyleRange?.[0]?.textStyle;
-    const fontSize = firstStyle?.size || textInfo.size || 14;
+    const rangeFontSize = normalizeFiniteNumber(firstStyle?.size);
+    const baseFontSize = normalizeFiniteNumber(textInfo.size);
+    const fontSize = rangeFontSize && rangeFontSize > 0
+      ? rangeFontSize
+      : baseFontSize && baseFontSize > 0
+        ? baseFontSize
+        : 14;
     const fontName = firstStyle?.fontName || textInfo.fontName || firstStyle?.fontPostScriptName || textInfo.fontPostScriptName || 'sans-serif';
     const fontDescriptor = `${textInfo.fontStyleName || ''} ${firstStyle?.fontStyleName || ''} ${textInfo.fontPostScriptName || ''} ${firstStyle?.fontPostScriptName || ''}`.toLowerCase();
 
@@ -1169,8 +1272,8 @@ export class LanhuParser {
   }
 
   private normalizeTextLineHeight(textInfo: LanhuLayer['textInfo'], fontSize: number): number | undefined {
-    const leading = textInfo?.leading ?? undefined;
-    if (leading === undefined || leading === null || !Number.isFinite(leading) || leading <= 0) {
+    const leading = normalizeFiniteNumber(textInfo?.leading);
+    if (leading === undefined || leading <= 0) {
       return undefined;
     }
 
@@ -1195,8 +1298,8 @@ export class LanhuParser {
   }
 
   private normalizeTextLetterSpacing(textInfo: LanhuLayer['textInfo'], fontSize: number): number | undefined {
-    const tracking = textInfo?.tracking ?? undefined;
-    if (tracking === undefined || tracking === null || !Number.isFinite(tracking) || tracking === 0) {
+    const tracking = normalizeFiniteNumber(textInfo?.tracking);
+    if (tracking === undefined || tracking === 0) {
       return undefined;
     }
 
@@ -1222,12 +1325,8 @@ export class LanhuParser {
     return Number(normalized.toFixed(2));
   }
 
-  private getRelativeRectHeight(bounds?: LanhuBounds | null): number {
-    if (!bounds) {
-      return 0;
-    }
-
-    return Math.max(bounds.bottom - bounds.top, 0);
+  private getRelativeRectHeight(bounds?: LanhuTextBounds | null): number {
+    return this.toRelativeRect(bounds)?.height || 0;
   }
 
   private extractTextStyleRanges(textInfo: LanhuLayer['textInfo']): SimplifiedTextStyleRange[] | undefined {
@@ -1235,18 +1334,35 @@ export class LanhuParser {
       return undefined;
     }
 
-    return textInfo.textStyleRange.map(range => {
+    const normalizedRanges = textInfo.textStyleRange.flatMap(range => {
+      const fromValue = normalizeFiniteNumber(range.from);
+      const toValue = normalizeFiniteNumber(range.to);
+      if (fromValue === undefined || toValue === undefined) {
+        return [];
+      }
+
+      const from = Math.max(0, Math.min(textInfo.text.length, Math.trunc(fromValue)));
+      const to = Math.max(0, Math.min(textInfo.text.length, Math.trunc(toValue)));
+      if (to <= from) {
+        return [];
+      }
+
       const descriptor = `${range.textStyle.fontStyleName || ''} ${range.textStyle.fontPostScriptName || ''}`.toLowerCase();
+      const fontStyle: SimplifiedTextStyleRange['fontStyle'] = /italic/.test(descriptor)
+        ? 'italic'
+        : 'normal';
       return {
-        from: range.from,
-        to: range.to,
-        fontSize: range.textStyle.size,
+        from,
+        to,
+        fontSize: this.normalizePositiveNumber(range.textStyle.size),
         fontFamily: range.textStyle.fontName || range.textStyle.fontPostScriptName,
         fontWeight: this.inferFontWeight(descriptor, false),
-        fontStyle: /italic/.test(descriptor) ? 'italic' : 'normal',
+        fontStyle,
         color: range.textStyle.color ? this.colorToHex(range.textStyle.color) : undefined,
       };
     });
+
+    return normalizedRanges.length > 0 ? normalizedRanges : undefined;
   }
 
   private extractTextMetrics(textInfo: LanhuLayer['textInfo']): SimplifiedTextMetrics | undefined {
@@ -1257,14 +1373,31 @@ export class LanhuParser {
     return {
       relativeBounds: this.toRelativeRect(textInfo.bounds),
       relativeBoundingBox: this.toRelativeRect(textInfo.boundingBox),
+      frameKind: this.getTextFrameKind(textInfo.textShape?.[0]?.char),
       antiAlias: textInfo.antiAlias,
       frameBaselineAlignment: textInfo.textShape?.[0]?.frameBaselineAlignment,
-      baselineShift: textInfo.baselineShift ?? undefined,
-      horizontalScale: textInfo.horizontalScale ?? undefined,
-      verticalScale: textInfo.verticalScale ?? undefined,
-      transformScaleX: textInfo._orgTransform?.xx,
-      transformScaleY: textInfo._orgTransform?.yy,
+      baselineShift: normalizeFiniteNumber(textInfo.baselineShift),
+      horizontalScale: normalizeFiniteNumber(textInfo.horizontalScale),
+      verticalScale: normalizeFiniteNumber(textInfo.verticalScale),
+      transformScaleX: normalizeFiniteNumber(textInfo._orgTransform?.xx),
+      transformScaleY: normalizeFiniteNumber(textInfo._orgTransform?.yy),
     };
+  }
+
+  private normalizePositiveNumber(value: unknown): number | undefined {
+    const normalized = normalizeFiniteNumber(value);
+    return normalized !== undefined && normalized > 0 ? normalized : undefined;
+  }
+
+  private getTextFrameKind(value?: string): SimplifiedTextMetrics['frameKind'] {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (/box|paragraph|area|frame/.test(normalized)) {
+      return 'paragraph';
+    }
+    if (/point|paint/.test(normalized)) {
+      return 'point';
+    }
+    return undefined;
   }
 
   private inferFontWeight(fontDescriptor: string, isBold: boolean): number {
@@ -1671,4 +1804,3 @@ export class LanhuParser {
 }
 
 export const lanhuParser = new LanhuParser();
-

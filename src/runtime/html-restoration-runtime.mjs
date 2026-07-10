@@ -65,7 +65,9 @@ const cookie = options.cookie ?? (process.env.LANHU_COOKIE || '');
 const directJsonUrl = options.jsonUrl ?? process.env.LANHU_JSON_URL;
 const directReferenceImageUrl = options.referenceImageUrl ?? (process.env.LANHU_REFERENCE_IMAGE_URL || null);
 const jsonPath = pageUrl || directJsonUrl ? null : path.resolve(options.jsonPath || process.env.SAMPLE_JSON_PATH || 'tmp_sample.json');
-const referenceImagePath = pageUrl || directReferenceImageUrl ? null : path.resolve(options.referenceImagePath || process.env.SAMPLE_REFERENCE_PATH || 'tmp_sample.png');
+const configuredReferenceImagePath = pageUrl || directJsonUrl || directReferenceImageUrl
+  ? null
+  : path.resolve(options.referenceImagePath || process.env.SAMPLE_REFERENCE_PATH || 'tmp_sample.png');
 const outputDir = path.resolve(
   options.outputDir
   || process.env.LANHU_OUTPUT_DIR
@@ -87,13 +89,14 @@ if (pageUrl && !cookie) {
 let document;
 let sourceMeta;
 let referenceImageUrl = directReferenceImageUrl;
+let localReferenceImagePath = configuredReferenceImagePath;
 let lanhuClient = cookie ? new LanhuClient(cookie) : null;
 
 if (pageUrl) {
   const imageInfo = await lanhuClient.getImageInfo(parseLanhuUrl(pageUrl));
   const latestVersion = lanhuClient.getLatestVersion(imageInfo);
   document = await lanhuClient.fetchSketchJson(latestVersion.json_url);
-  referenceImageUrl = referenceImageUrl || imageInfo.url || latestVersion.url;
+  referenceImageUrl = referenceImageUrl || latestVersion.url || imageInfo.url;
   sourceMeta = {
     mode: 'page_url',
     pageUrl,
@@ -129,9 +132,17 @@ if (pageUrl) {
   sourceMeta = {
     mode: 'local_sample',
     jsonPath,
-    imagePath: referenceImagePath,
-    referenceImagePath,
+    imagePath: configuredReferenceImagePath,
+    referenceImagePath: configuredReferenceImagePath,
   };
+}
+
+if (referenceImageUrl && lanhuClient) {
+  const referenceDownload = await lanhuClient.fetchBinaryWithMetadata(referenceImageUrl);
+  const referenceExtension = resolveReferenceImageExtension(referenceImageUrl, referenceDownload.contentType);
+  localReferenceImagePath = path.join(outputDir, `${outputPrefix}-reference${referenceExtension}`);
+  await fs.writeFile(localReferenceImagePath, referenceDownload.buffer);
+  sourceMeta.referenceImagePath = localReferenceImagePath;
 }
 
 const parser = new LanhuParser();
@@ -282,6 +293,30 @@ async function localizeAssetUrls(nodes, assetSummaries = []) {
   });
 }
 
+function resolveReferenceImageExtension(sourceUrl, contentType) {
+  const normalizedContentType = String(contentType || '').split(';')[0].trim().toLowerCase();
+  const extensionsByContentType = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+  };
+  if (extensionsByContentType[normalizedContentType]) {
+    return extensionsByContentType[normalizedContentType];
+  }
+
+  try {
+    const extension = path.extname(new URL(sourceUrl).pathname).toLowerCase();
+    if (['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(extension)) {
+      return extension;
+    }
+  } catch {
+    // Use a stable extension when the source is not a parseable URL.
+  }
+
+  return '.png';
+}
+
 function sortByPaint(nodes) {
   return [...nodes].sort((left, right) => (right.zIndex || 0) - (left.zIndex || 0));
 }
@@ -316,6 +351,7 @@ function hasOwnVisual(node) {
 
 function isRenderable(node) {
   if (!node.visible) return false;
+  if (!node.bounds || !Number.isFinite(node.bounds.width) || !Number.isFinite(node.bounds.height)) return false;
   if (node.bounds.width <= 0 || node.bounds.height <= 0) return false;
   if (node.intersectsArtboard === false) return false;
   return true;
@@ -349,6 +385,18 @@ function hasBitmapFallback(node) {
     || (node.name === 'Path' && node.bounds.y <= 40 && node.bounds.width >= 600);
 }
 
+function finiteNumber(value, fallback = 0) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function finiteOptionalNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function pixelValue(value, fallback = 0) {
+  return `${finiteNumber(value, fallback)}px`;
+}
+
 function radiusValue(node) {
   if (node.shapeType === 'ellipse') {
     return '9999px';
@@ -357,9 +405,12 @@ function radiusValue(node) {
     return '';
   }
   if (Array.isArray(node.borderRadius)) {
-    return node.borderRadius.map(value => `${value}px`).join(' ');
+    if (node.borderRadius.some(value => finiteOptionalNumber(value) === undefined)) {
+      return '';
+    }
+    return node.borderRadius.map(value => pixelValue(value)).join(' ');
   }
-  return `${node.borderRadius}px`;
+  return finiteOptionalNumber(node.borderRadius) === undefined ? '' : pixelValue(node.borderRadius);
 }
 
 function boxShadowValue(node) {
@@ -367,7 +418,7 @@ function boxShadowValue(node) {
     return '';
   }
   return node.shadows
-    .map(shadow => `${shadow.type === 'innerShadow' ? 'inset ' : ''}${shadow.x}px ${shadow.y}px ${shadow.blur}px ${shadow.spread}px ${shadow.color}`)
+    .map(shadow => `${shadow.type === 'innerShadow' ? 'inset ' : ''}${pixelValue(shadow.x)} ${pixelValue(shadow.y)} ${pixelValue(shadow.blur)} ${pixelValue(shadow.spread)} ${shadow.color}`)
     .join(',');
 }
 
@@ -395,33 +446,37 @@ function boxStyles(node, {
     }
     styles.push('flex:0 0 auto');
   } else {
-    let left = node.bounds.x - offsetX;
+    const boundsX = finiteNumber(node.bounds.x);
+    const boundsY = finiteNumber(node.bounds.y);
+    const boundsWidth = finiteNumber(node.bounds.width);
+    let left = boundsX - finiteNumber(offsetX);
     if ((node.text || node.isTextOnlyContainer) && node.sizeHint?.width === 'content') {
       if (node.textStyle?.alignment === 'center') {
-        left = node.bounds.x + node.bounds.width / 2 - offsetX;
+        left = boundsX + boundsWidth / 2 - finiteNumber(offsetX);
         transforms.push('translateX(-50%)');
       } else if (node.textStyle?.alignment === 'right') {
-        left = node.bounds.x + node.bounds.width - offsetX;
+        left = boundsX + boundsWidth - finiteNumber(offsetX);
         transforms.push('translateX(-100%)');
       }
     }
     styles.push('position:absolute');
-    styles.push(`left:${left}px`);
-    styles.push(`top:${node.bounds.y - offsetY}px`);
+    styles.push(`left:${pixelValue(left)}`);
+    styles.push(`top:${pixelValue(boundsY - finiteNumber(offsetY))}`);
   }
 
   const shouldOmitWidth = omitWidth ?? (node.sizeHint?.width === 'content');
   const shouldOmitHeight = omitHeight ?? (node.sizeHint?.height === 'content');
 
   if (!shouldOmitWidth) {
-    styles.push(`width:${node.bounds.width}px`);
+    styles.push(`width:${pixelValue(node.bounds.width)}`);
   }
   if (!shouldOmitHeight) {
-    styles.push(`height:${node.bounds.height}px`);
+    styles.push(`height:${pixelValue(node.bounds.height)}`);
   }
 
-  if (node.opacity !== undefined) {
-    styles.push(`opacity:${node.opacity}`);
+  const opacity = finiteOptionalNumber(node.opacity);
+  if (opacity !== undefined) {
+    styles.push(`opacity:${opacity}`);
   }
 
   if (includeVisual) {
@@ -433,7 +488,7 @@ function boxStyles(node, {
     }
 
     if (visualNode.stroke) {
-      styles.push(`border:${visualNode.stroke.width}px solid ${visualNode.stroke.color}`);
+      styles.push(`border:${pixelValue(visualNode.stroke.width)} solid ${visualNode.stroke.color}`);
     }
 
     const radius = radiusValue(visualNode);
@@ -447,13 +502,15 @@ function boxStyles(node, {
     }
   }
 
-  if (node.textMetrics?.transformScaleX && Math.abs(node.textMetrics.transformScaleX - 1) > 0.001) {
-    const scaleY = node.textMetrics.transformScaleY && Math.abs(node.textMetrics.transformScaleY - 1) > 0.001
-      ? ` scaleY(${node.textMetrics.transformScaleY})`
+  const transformScaleX = finiteOptionalNumber(node.textMetrics?.transformScaleX);
+  const transformScaleY = finiteOptionalNumber(node.textMetrics?.transformScaleY);
+  if (transformScaleX !== undefined && Math.abs(transformScaleX - 1) > 0.001) {
+    const scaleY = transformScaleY !== undefined && Math.abs(transformScaleY - 1) > 0.001
+      ? ` scaleY(${transformScaleY})`
       : '';
-    transforms.push(`scaleX(${node.textMetrics.transformScaleX})${scaleY}`);
-  } else if (node.textMetrics?.transformScaleY && Math.abs(node.textMetrics.transformScaleY - 1) > 0.001) {
-    transforms.push(`scaleY(${node.textMetrics.transformScaleY})`);
+    transforms.push(`scaleX(${transformScaleX})${scaleY}`);
+  } else if (transformScaleY !== undefined && Math.abs(transformScaleY - 1) > 0.001) {
+    transforms.push(`scaleY(${transformScaleY})`);
   }
 
   if (forceClip) {
@@ -564,73 +621,69 @@ function getVisualFillValue(visualNode) {
 }
 
 function resolveLineHeight(node, style, singleLine) {
-  if (style.lineHeight) {
-    return `${style.lineHeight}px`;
+  const explicitLineHeight = finiteOptionalNumber(style.lineHeight);
+  if (explicitLineHeight !== undefined && explicitLineHeight > 0) {
+    return pixelValue(explicitLineHeight);
   }
 
-  const fontSize = style.fontSize || 14;
+  const fontSize = Math.max(finiteNumber(style.fontSize, 14), 1);
   if (!singleLine) {
-    return `${Number((fontSize * 1.2).toFixed(2))}px`;
+    return pixelValue(Number((fontSize * 1.2).toFixed(2)));
   }
 
-  const frameHeight = node.bounds.height || 0;
-  const measuredHeight = node.textMetrics?.relativeBoundingBox?.height
-    || node.textMetrics?.relativeBounds?.height
-    || 0;
+  const frameHeight = Math.max(finiteNumber(node.bounds.height), 0);
+  const measuredHeight = Math.max(
+    finiteNumber(node.textMetrics?.relativeBoundingBox?.height)
+    || finiteNumber(node.textMetrics?.relativeBounds?.height),
+    0,
+  );
   const preferredHeight = frameHeight || measuredHeight || fontSize;
   const fallback = Math.max(
     Math.min(preferredHeight, Number((fontSize * 1.2).toFixed(2))),
     Math.min(fontSize * 0.72, preferredHeight),
   );
 
-  return `${Number(fallback.toFixed(2))}px`;
-}
-
-function shouldPreserveFlowTextWidth(node, style, mode) {
-  if (mode !== 'flow') {
-    return false;
-  }
-
-  if (style.alignment === 'center' || style.alignment === 'right') {
-    return true;
-  }
-
-  const boundingWidth = node.textMetrics?.relativeBoundingBox?.width || 0;
-  return boundingWidth > 0 && node.bounds.width - boundingWidth >= 6;
+  return pixelValue(Number(fallback.toFixed(2)));
 }
 
 function textContainerStyles(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
   const style = node.textStyle || {};
-  const singleLine = !String(node.text || '').includes('\n');
-  const preserveFlowWidth = shouldPreserveFlowTextWidth(node, style, mode);
+  const contentSizedPointText = node.sizeHint?.width === 'content'
+    && node.textMetrics?.frameKind !== 'paragraph'
+    && !String(node.text || '').includes('\n');
+  const preserveFrameWidth = !contentSizedPointText;
+  const preserveFrameHeight = node.sizeHint?.height !== 'content';
+  const fontSize = Math.max(finiteNumber(style.fontSize, 14), 1);
+  const fontWeight = finiteNumber(style.fontWeight, 400);
   const styles = [
     boxStyles(node, {
       offsetX,
       offsetY,
       forceClip: false,
       mode,
-      omitWidth: !preserveFlowWidth,
-      omitHeight: true,
+      omitWidth: !preserveFrameWidth,
+      omitHeight: !preserveFrameHeight,
       includeVisual: false,
     }),
-    `white-space:${singleLine ? 'nowrap' : 'pre-wrap'}`,
-    `word-break:${singleLine ? 'keep-all' : 'break-word'}`,
+    `white-space:${contentSizedPointText ? 'nowrap' : 'pre-wrap'}`,
+    `word-break:${contentSizedPointText ? 'keep-all' : 'break-word'}`,
     'overflow:visible',
     'background:transparent',
-    'display:inline-block',
-    `font-size:${style.fontSize || 14}px`,
+    `display:${contentSizedPointText ? 'inline-block' : 'block'}`,
+    `font-size:${pixelValue(fontSize)}`,
     `font-family:'${style.fontFamily || 'sans-serif'}','Microsoft YaHei','PingFang SC',sans-serif`,
-    `font-weight:${style.fontWeight || 400}`,
+    `font-weight:${fontWeight}`,
     `font-style:${style.fontStyle || 'normal'}`,
     `color:${style.color || '#000000'}`,
     `text-align:${style.alignment || 'left'}`,
     'max-width:none',
   ];
 
-  styles.push(`line-height:${resolveLineHeight(node, style, singleLine)}`);
+  styles.push(`line-height:${resolveLineHeight(node, style, contentSizedPointText)}`);
 
-  if (style.letterSpacing !== undefined) {
-    styles.push(`letter-spacing:${style.letterSpacing}px`);
+  const letterSpacing = finiteOptionalNumber(style.letterSpacing);
+  if (letterSpacing !== undefined) {
+    styles.push(`letter-spacing:${pixelValue(letterSpacing)}`);
   }
 
   return styles.join(';');
@@ -657,9 +710,11 @@ function assetWrapperStyles(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
 
 function stylesForRange(range) {
   const styles = [];
-  if (range.fontSize) styles.push(`font-size:${range.fontSize}px`);
+  const fontSize = finiteOptionalNumber(range.fontSize);
+  const fontWeight = finiteOptionalNumber(range.fontWeight);
+  if (fontSize !== undefined && fontSize > 0) styles.push(`font-size:${pixelValue(fontSize)}`);
   if (range.fontFamily) styles.push(`font-family:'${range.fontFamily}','PingFang SC','Microsoft YaHei',sans-serif`);
-  if (range.fontWeight) styles.push(`font-weight:${range.fontWeight}`);
+  if (fontWeight !== undefined) styles.push(`font-weight:${fontWeight}`);
   if (range.fontStyle) styles.push(`font-style:${range.fontStyle}`);
   if (range.color) styles.push(`color:${range.color}`);
   return styles.join(';');
@@ -861,8 +916,8 @@ function renderEllipseDotsShape(node, ellipseBounds, offsetX = 0, offsetY = 0, m
   const fill = node.fill || '#000000';
   const dotsHtml = ellipseBounds.map(bounds => {
     const dotStyle = [
-      `width:${bounds.width}px`,
-      `height:${bounds.height}px`,
+      `width:${pixelValue(bounds.width)}`,
+      `height:${pixelValue(bounds.height)}`,
       `background:${fill}`,
       'border-radius:9999px',
       'flex:0 0 auto',
@@ -881,14 +936,14 @@ function renderEllipseRingShape(node, ringLayout, offsetX = 0, offsetY = 0, mode
     'display:flex',
     'align-items:center',
     'justify-content:center',
-    `border:${ringLayout.ringThickness}px solid ${fill}`,
+    `border:${pixelValue(ringLayout.ringThickness)} solid ${fill}`,
     'border-radius:9999px',
     'box-sizing:border-box',
     'background:transparent',
   ].join(';');
   const dotStyle = [
-    `width:${ringLayout.centerBounds.width}px`,
-    `height:${ringLayout.centerBounds.height}px`,
+    `width:${pixelValue(ringLayout.centerBounds.width)}`,
+    `height:${pixelValue(ringLayout.centerBounds.height)}`,
     `background:${fill}`,
     'border-radius:9999px',
     'flex:0 0 auto',
@@ -1973,7 +2028,7 @@ function flexLayoutStyles(node, mode = 'absolute') {
     `flex-direction:${layout.mode === 'flex-row' ? 'row' : 'column'}`,
     `justify-content:${toFlexJustify(layout.justifyContent)}`,
     `align-items:${toFlexAlign(layout.alignItems)}`,
-    `gap:${layout.lines?.length ? 0 : layout.gap || 0}px`,
+    `gap:${layout.lines?.length || layout.justifyContent === 'space-between' ? 0 : finiteNumber(layout.gap)}px`,
     'box-sizing:border-box',
   ];
 
@@ -2126,7 +2181,9 @@ function renderLayoutLines(node, insideMask = false) {
       items.length > 1 ? 'flex-direction:row' : '',
       items.length > 1 ? `justify-content:${toFlexJustify(line.justifyContent)}` : '',
       items.length > 1 ? `align-items:${toFlexAlign(line.alignItems)}` : '',
-      items.length > 1 ? `gap:${line.gap || 0}px` : '',
+      items.length > 1 && line.justifyContent !== 'space-between'
+        ? `gap:${pixelValue(line.gap)}`
+        : '',
       'box-sizing:border-box',
     ];
 
@@ -2583,16 +2640,37 @@ await fs.writeFile(htmlPath, html, 'utf8');
 await fs.writeFile(parsedPath, JSON.stringify({ artboard, restoration, localizedAssets, layers }, null, 2), 'utf8');
 
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({
-  viewport: { width: Math.ceil(artboard.width), height: Math.ceil(artboard.height) },
-  deviceScaleFactor: 1,
-});
-await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle' });
-await page.locator('#artboard').screenshot({ path: screenshotPath });
-await browser.close();
+try {
+  const page = await browser.newPage({
+    viewport: { width: Math.ceil(artboard.width), height: Math.ceil(artboard.height) },
+    deviceScaleFactor: 1,
+  });
+  await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle' });
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(Array.from(document.images).map(async image => {
+      if (!image.complete) {
+        await Promise.race([
+          new Promise(resolve => {
+            image.addEventListener('load', resolve, { once: true });
+            image.addEventListener('error', resolve, { once: true });
+          }),
+          new Promise(resolve => window.setTimeout(resolve, 5000)),
+        ]);
+      }
+
+      if (typeof image.decode === 'function') {
+        await image.decode().catch(() => undefined);
+      }
+    }));
+  });
+  await page.locator('#artboard').screenshot({ path: screenshotPath });
+} finally {
+  await browser.close();
+}
 
 let compare = null;
-if (referenceImageUrl || referenceImagePath) {
+if (localReferenceImagePath || referenceImageUrl) {
   const compareParams = {
     candidateImagePath: screenshotPath,
     diffOutputPath: diffPath,
@@ -2602,15 +2680,15 @@ if (referenceImageUrl || referenceImagePath) {
     gridCols: 4,
   };
 
-  if (referenceImageUrl) {
+  if (localReferenceImagePath) {
     compare = await imageCompareService.compare({
       ...compareParams,
-      referenceImageUrl,
+      referenceImagePath: localReferenceImagePath,
     });
   } else {
     compare = await imageCompareService.compare({
       ...compareParams,
-      referenceImagePath,
+      referenceImageUrl,
     });
   }
 }

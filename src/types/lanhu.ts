@@ -31,13 +31,22 @@ export interface LanhuUnitValue {
   units: string;
 }
 
+export type LanhuNumericValue = number | LanhuUnitValue;
+
+export interface LanhuTextBounds {
+  top: LanhuNumericValue;
+  left: LanhuNumericValue;
+  bottom: LanhuNumericValue;
+  right: LanhuNumericValue;
+}
+
 export interface LanhuTextStyleRange {
-  from: number;
-  to: number;
+  from: LanhuNumericValue;
+  to: LanhuNumericValue;
   textStyle: {
     fontName?: string;
     fontStyleName?: string;
-    size?: number;
+    size?: LanhuNumericValue;
     fontPostScriptName?: string;
     color?: LanhuColor;
     fontTechnology?: number;
@@ -47,52 +56,52 @@ export interface LanhuTextStyleRange {
 export interface LanhuTextInfo {
   text: string;
   color?: LanhuColor;
-  size?: number;
+  size?: LanhuNumericValue;
   fontPostScriptName?: string;
   bold?: boolean;
   italic?: boolean;
   justification?: 'left' | 'center' | 'right';
-  leading?: number | null;
-  tracking?: number | null;
-  baselineShift?: number | null;
-  horizontalScale?: number | null;
-  verticalScale?: number | null;
+  leading?: LanhuNumericValue | null;
+  tracking?: LanhuNumericValue | null;
+  baselineShift?: LanhuNumericValue | null;
+  horizontalScale?: LanhuNumericValue | null;
+  verticalScale?: LanhuNumericValue | null;
   fontName?: string;
   fontStyleName?: string;
   antiAlias?: string;
   _orgTransform?: {
-    xx: number;
-    xy: number;
-    yx: number;
-    yy: number;
-    tx: number;
-    ty: number;
+    xx: LanhuNumericValue;
+    xy: LanhuNumericValue;
+    yx: LanhuNumericValue;
+    yy: LanhuNumericValue;
+    tx: LanhuNumericValue;
+    ty: LanhuNumericValue;
   };
   textStyleRange?: LanhuTextStyleRange[];
-  bounds?: LanhuBounds;
-  boundingBox?: LanhuBounds;
+  bounds?: LanhuTextBounds;
+  boundingBox?: LanhuTextBounds;
   textShape?: Array<{
     char?: string;
     orientation?: string;
     transform?: {
-      xx: number;
-      xy: number;
-      yx: number;
-      yy: number;
-      tx: number;
-      ty: number;
+      xx: LanhuNumericValue;
+      xy: LanhuNumericValue;
+      yx: LanhuNumericValue;
+      yy: LanhuNumericValue;
+      tx: LanhuNumericValue;
+      ty: LanhuNumericValue;
     };
-    rowCount?: number;
-    columnCount?: number;
+    rowCount?: LanhuNumericValue;
+    columnCount?: LanhuNumericValue;
     rowMajorOrder?: boolean;
-    rowGutter?: number;
-    columnGutter?: number;
-    spacing?: number;
+    rowGutter?: LanhuNumericValue;
+    columnGutter?: LanhuNumericValue;
+    spacing?: LanhuNumericValue;
     frameBaselineAlignment?: string;
-    firstBaselineMinimum?: number;
+    firstBaselineMinimum?: LanhuNumericValue;
     base?: {
-      horizontal?: number;
-      vertical?: number;
+      horizontal?: LanhuNumericValue;
+      vertical?: LanhuNumericValue;
     };
   }>;
 }
@@ -358,6 +367,7 @@ export interface SimplifiedTextStyleRange {
 export interface SimplifiedTextMetrics {
   relativeBounds?: SimplifiedRelativeRect;
   relativeBoundingBox?: SimplifiedRelativeRect;
+  frameKind?: 'point' | 'paragraph';
   antiAlias?: string;
   frameBaselineAlignment?: string;
   baselineShift?: number;

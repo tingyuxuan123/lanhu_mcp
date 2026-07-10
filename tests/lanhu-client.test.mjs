@@ -185,3 +185,32 @@ test('LanhuClient.getImageInfo uses provided team_id directly', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('LanhuClient.fetchBinaryWithMetadata authenticates protected reference downloads', async () => {
+  const originalFetch = globalThis.fetch;
+  const expectedBytes = Uint8Array.from([137, 80, 78, 71]);
+
+  globalThis.fetch = async (url, init = {}) => {
+    assert.equal(String(url), 'https://lanhuapp.com/protected/reference.png');
+    assert.equal(init.method, 'GET');
+    assert.equal(init.headers.Cookie, 'session=secret-value');
+    assert.equal(init.headers.Referer, 'https://lanhuapp.com/web/');
+    assert.equal(init.headers.Accept, '*/*');
+    return new Response(expectedBytes, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+      },
+    });
+  };
+
+  try {
+    const client = new LanhuClient('session=secret-value');
+    const result = await client.fetchBinaryWithMetadata('https://lanhuapp.com/protected/reference.png');
+
+    assert.deepEqual([...result.buffer], [...expectedBytes]);
+    assert.equal(result.contentType, 'image/png');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

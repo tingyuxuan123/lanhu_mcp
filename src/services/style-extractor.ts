@@ -2,7 +2,7 @@
  * Style extraction helpers.
  */
 
-import type { SimplifiedLayer } from '../types/lanhu.js';
+import type { SimplifiedLayer, SimplifiedLayoutHint } from '../types/lanhu.js';
 
 export type OutputFormat = 'css' | 'tailwind' | 'react' | 'vue';
 
@@ -36,7 +36,7 @@ export class StyleExtractor {
     if (isFlex) {
       lines.push('  display: flex;');
       lines.push(`  flex-direction: ${node.layoutHint?.mode === 'flex-row' ? 'row' : 'column'};`);
-      if (node.layoutHint?.gap !== undefined) {
+      if (this.shouldEmitExplicitFlexGap(node.layoutHint)) {
         lines.push(`  gap: ${node.layoutHint.gap}px;`);
       }
       if (node.layoutHint?.justifyContent) {
@@ -121,7 +121,7 @@ export class StyleExtractor {
     if (node.layoutHint && node.layoutHint.mode !== 'absolute') {
       classes.push('flex');
       classes.push(node.layoutHint.mode === 'flex-row' ? 'flex-row' : 'flex-col');
-      if (node.layoutHint.gap !== undefined) classes.push(`gap-[${node.layoutHint.gap}px]`);
+      if (this.shouldEmitExplicitFlexGap(node.layoutHint)) classes.push(`gap-[${node.layoutHint.gap}px]`);
       if (node.layoutHint.padding) {
         classes.push(`pt-[${node.layoutHint.padding.top}px]`);
         classes.push(`pr-[${node.layoutHint.padding.right}px]`);
@@ -180,7 +180,7 @@ export class StyleExtractor {
     if (node.layoutHint && node.layoutHint.mode !== 'absolute') {
       style.display = 'flex';
       style.flexDirection = node.layoutHint.mode === 'flex-row' ? 'row' : 'column';
-      if (node.layoutHint.gap !== undefined) style.gap = `${node.layoutHint.gap}px`;
+      if (this.shouldEmitExplicitFlexGap(node.layoutHint)) style.gap = `${node.layoutHint.gap}px`;
       if (node.layoutHint.justifyContent) style.justifyContent = this.toCssFlexValue(node.layoutHint.justifyContent);
       if (node.layoutHint.alignItems) style.alignItems = this.toCssFlexValue(node.layoutHint.alignItems);
       if (node.layoutHint.padding) {
@@ -245,6 +245,16 @@ export class StyleExtractor {
     if (value === 'start') return 'flex-start';
     if (value === 'end') return 'flex-end';
     return value;
+  }
+
+  private shouldEmitExplicitFlexGap(layoutHint: SimplifiedLayoutHint | undefined): layoutHint is SimplifiedLayoutHint & { gap: number } {
+    return Boolean(
+      layoutHint
+      && layoutHint.justifyContent !== 'space-between'
+      && typeof layoutHint.gap === 'number'
+      && Number.isFinite(layoutHint.gap)
+      && layoutHint.gap > 0,
+    );
   }
 
   private getAssetReference(node: SimplifiedLayer): string | undefined {
