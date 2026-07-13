@@ -9,7 +9,6 @@ import type {
   SimplifiedBounds,
   SimplifiedLayer,
 } from '../types/lanhu.js';
-import { normalizeLanhuAssetUrl } from '../utils/lanhu-resource-url.js';
 
 export interface AssetBinaryPayload {
   buffer: Buffer;
@@ -201,7 +200,7 @@ export class AssetLocalizer {
   private getRemoteAssetUrl(reference: AssetReference): string | undefined {
     const candidate = reference.remoteAssetUrl || reference.assetUrl;
     return candidate && /^https?:\/\//i.test(candidate)
-      ? normalizeLanhuAssetUrl(candidate)
+      ? candidate
       : undefined;
   }
 
@@ -338,7 +337,7 @@ export class AssetLocalizer {
 }
 
 async function defaultAssetDownloader(sourceUrl: string): Promise<AssetBinaryPayload> {
-  const response = await fetch(normalizeLanhuAssetUrl(sourceUrl), {
+  const response = await fetch(sourceUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       Accept: '*/*',

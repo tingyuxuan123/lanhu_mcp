@@ -8,7 +8,6 @@ import type {
   SimplifiedTextStyle,
   SimplifiedTextStyleRange,
 } from '../types/lanhu.js';
-import { buildLayoutRenderModel } from './layout-model.js';
 import {
   buildUniAppRenderModel,
   type UniAppSemanticMetadata,
@@ -51,8 +50,7 @@ export function renderUniAppRoot(
 ): string {
   const designWidth = normalizeDesignWidth(options.designWidth, artboard.width);
   const componentName = normalizeComponentName(options.componentName || artboard.name || DEFAULT_COMPONENT_NAME);
-  const layoutModel = buildLayoutRenderModel(nodes);
-  const renderModel = buildUniAppRenderModel(layoutModel.nodes, artboard);
+  const renderModel = buildUniAppRenderModel(nodes, artboard);
   const state: RenderState = {
     designWidth,
     componentName,
@@ -361,12 +359,7 @@ function renderFlexLines(node: SimplifiedLayer, flowChildren: SimplifiedLayer[],
       const declarations = [
         'width: 100%',
       ];
-      if (
-        line.justifyContent !== 'space-between'
-        && typeof line.gap === 'number'
-        && Number.isFinite(line.gap)
-        && line.gap > 0
-      ) {
+      if (typeof line.gap === 'number' && line.gap > 0) {
         declarations.push(`column-gap: ${pxToRpx(line.gap, context.state.designWidth)}`);
       }
       if (line.justifyContent) {
@@ -497,12 +490,7 @@ function applyFlexDeclarations(declarations: string[], layoutHint: SimplifiedLay
     return;
   }
 
-  if (
-    layoutHint.justifyContent !== 'space-between'
-    && typeof layoutHint.gap === 'number'
-    && Number.isFinite(layoutHint.gap)
-    && layoutHint.gap > 0
-  ) {
+  if (typeof layoutHint.gap === 'number' && layoutHint.gap > 0) {
     declarations.push(`gap: ${pxToRpx(layoutHint.gap, designWidth)}`);
   }
   if (layoutHint.padding) {
@@ -540,11 +528,9 @@ function applyTextDeclarations(declarations: string[], textStyle: SimplifiedText
 }
 
 function applyTextLayoutDeclarations(declarations: string[], node: SimplifiedLayer): void {
-  const contentSizedPointText = node.sizeHint?.width === 'content'
-    && node.textMetrics?.frameKind !== 'paragraph'
-    && isSingleLineText(node.text || '');
-  declarations.push(`white-space: ${contentSizedPointText ? 'nowrap' : 'pre-wrap'}`);
-  declarations.push(`word-break: ${contentSizedPointText ? 'keep-all' : 'break-word'}`);
+  const singleLine = isSingleLineText(node.text || '');
+  declarations.push(`white-space: ${singleLine ? 'nowrap' : 'pre-wrap'}`);
+  declarations.push(`word-break: ${singleLine ? 'keep-all' : 'break-word'}`);
 }
 
 function buildTextSegments(node: SimplifiedLayer, state: RenderState): TextSegment[] {
@@ -661,7 +647,7 @@ function getPromotedAbsoluteChild(node: SimplifiedLayer, context: RenderNodeCont
   if (context.positionMode !== 'absolute') {
     return undefined;
   }
-  if (node.layoutHint || node.sourceLayoutHint || hasOwnVisual(node) || node.clip?.clipped || node.clip?.isMask) {
+  if (node.layoutHint || hasOwnVisual(node) || node.clip?.clipped || node.clip?.isMask) {
     return undefined;
   }
 

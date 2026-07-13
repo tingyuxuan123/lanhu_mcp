@@ -31,22 +31,13 @@ export interface LanhuUnitValue {
   units: string;
 }
 
-export type LanhuNumericValue = number | LanhuUnitValue;
-
-export interface LanhuTextBounds {
-  top: LanhuNumericValue;
-  left: LanhuNumericValue;
-  bottom: LanhuNumericValue;
-  right: LanhuNumericValue;
-}
-
 export interface LanhuTextStyleRange {
-  from: LanhuNumericValue;
-  to: LanhuNumericValue;
+  from: number;
+  to: number;
   textStyle: {
     fontName?: string;
     fontStyleName?: string;
-    size?: LanhuNumericValue;
+    size?: number;
     fontPostScriptName?: string;
     color?: LanhuColor;
     fontTechnology?: number;
@@ -56,52 +47,52 @@ export interface LanhuTextStyleRange {
 export interface LanhuTextInfo {
   text: string;
   color?: LanhuColor;
-  size?: LanhuNumericValue;
+  size?: number;
   fontPostScriptName?: string;
   bold?: boolean;
   italic?: boolean;
   justification?: 'left' | 'center' | 'right';
-  leading?: LanhuNumericValue | null;
-  tracking?: LanhuNumericValue | null;
-  baselineShift?: LanhuNumericValue | null;
-  horizontalScale?: LanhuNumericValue | null;
-  verticalScale?: LanhuNumericValue | null;
+  leading?: number | null;
+  tracking?: number | null;
+  baselineShift?: number | null;
+  horizontalScale?: number | null;
+  verticalScale?: number | null;
   fontName?: string;
   fontStyleName?: string;
   antiAlias?: string;
   _orgTransform?: {
-    xx: LanhuNumericValue;
-    xy: LanhuNumericValue;
-    yx: LanhuNumericValue;
-    yy: LanhuNumericValue;
-    tx: LanhuNumericValue;
-    ty: LanhuNumericValue;
+    xx: number;
+    xy: number;
+    yx: number;
+    yy: number;
+    tx: number;
+    ty: number;
   };
   textStyleRange?: LanhuTextStyleRange[];
-  bounds?: LanhuTextBounds;
-  boundingBox?: LanhuTextBounds;
+  bounds?: LanhuBounds;
+  boundingBox?: LanhuBounds;
   textShape?: Array<{
     char?: string;
     orientation?: string;
     transform?: {
-      xx: LanhuNumericValue;
-      xy: LanhuNumericValue;
-      yx: LanhuNumericValue;
-      yy: LanhuNumericValue;
-      tx: LanhuNumericValue;
-      ty: LanhuNumericValue;
+      xx: number;
+      xy: number;
+      yx: number;
+      yy: number;
+      tx: number;
+      ty: number;
     };
-    rowCount?: LanhuNumericValue;
-    columnCount?: LanhuNumericValue;
+    rowCount?: number;
+    columnCount?: number;
     rowMajorOrder?: boolean;
-    rowGutter?: LanhuNumericValue;
-    columnGutter?: LanhuNumericValue;
-    spacing?: LanhuNumericValue;
+    rowGutter?: number;
+    columnGutter?: number;
+    spacing?: number;
     frameBaselineAlignment?: string;
-    firstBaselineMinimum?: LanhuNumericValue;
+    firstBaselineMinimum?: number;
     base?: {
-      horizontal?: LanhuNumericValue;
-      vertical?: LanhuNumericValue;
+      horizontal?: number;
+      vertical?: number;
     };
   }>;
 }
@@ -367,7 +358,6 @@ export interface SimplifiedTextStyleRange {
 export interface SimplifiedTextMetrics {
   relativeBounds?: SimplifiedRelativeRect;
   relativeBoundingBox?: SimplifiedRelativeRect;
-  frameKind?: 'point' | 'paragraph';
   antiAlias?: string;
   frameBaselineAlignment?: string;
   baselineShift?: number;
@@ -469,18 +459,6 @@ export interface SimplifiedLayoutHint {
   }>;
 }
 
-export type SimplifiedLayoutDecisionMode = 'absolute' | 'linear-flow' | 'stacked-lines';
-
-export interface SimplifiedLayoutDecision {
-  mode: SimplifiedLayoutDecisionMode;
-  layoutHint?: SimplifiedLayoutHint;
-  evidence: {
-    candidate: 'parser' | 'geometry';
-    residual: number;
-    reason?: string;
-  };
-}
-
 export interface SimplifiedSizeHint {
   width: 'fixed' | 'content';
   height: 'fixed' | 'content';
@@ -498,8 +476,6 @@ export interface SimplifiedLayer {
   parentId?: number;
   depth?: number;
   zIndex?: number;
-  /** Layout geometry remains stable when visual effects expand a layer. */
-  layoutBounds?: SimplifiedBounds;
   bounds: SimplifiedBounds;
   boundsMetadata?: SimplifiedBoundsMetadata;
   intersectsArtboard?: boolean;
@@ -528,10 +504,7 @@ export interface SimplifiedLayer {
   localAssetFilePath?: string;
   renderStrategy?: SimplifiedRenderStrategy;
   shouldRenderChildren?: boolean;
-  /** Parser-provided layout intent kept for semantic classification only. */
-  sourceLayoutHint?: SimplifiedLayoutHint;
   layoutHint?: SimplifiedLayoutHint;
-  layoutDecision?: SimplifiedLayoutDecision;
   sizeHint?: SimplifiedSizeHint;
   isTextOnlyContainer?: boolean;
   containerVisualSourceId?: number;

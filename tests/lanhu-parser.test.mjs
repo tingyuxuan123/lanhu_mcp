@@ -61,43 +61,6 @@ test('parser extracts restoration masks and paint order for sample', async () =>
   assert.ok(restoration.clippedLayerIds.length > 0);
 });
 
-test('parser normalizes image source dictionaries to the canonical asset CDN', () => {
-  const parser = new LanhuParser();
-  const document = parser.parseDocument({
-    board: {
-      id: 1,
-      type: 'artboardSection',
-      name: 'Asset URL normalization',
-      visible: true,
-      clipped: false,
-      artboard: {
-        artboardRect: { top: 0, left: 0, bottom: 100, right: 100 },
-      },
-      layers: [
-        {
-          id: 2,
-          type: 'smartObjectLayer',
-          name: 'Remote image',
-          visible: true,
-          clipped: false,
-          pixels: true,
-          boundsWithFX: { top: 0, left: 0, bottom: 20, right: 20 },
-          images: {
-            png_xxxhd: 'https://lanhu-oss-proxy.lanhuapp.com/max_abc123',
-          },
-        },
-      ],
-    },
-  });
-
-  const [node] = parser.buildLayerTree(document, 30);
-  const [asset] = parser.extractAssets(document);
-
-  assert.equal(node.assetUrls?.png_xxxhd, 'https://assets.lanhuapp.com/max_abc123');
-  assert.equal(node.assetUrl, 'https://assets.lanhuapp.com/max_abc123');
-  assert.equal(asset.assetUrls?.png_xxxhd, 'https://assets.lanhuapp.com/max_abc123');
-});
-
 test('parser keeps partially outside nodes that still intersect the artboard', async () => {
   const { layers } = await loadSampleLayers();
   const all = flatten(layers);
@@ -118,16 +81,16 @@ test('parser exposes mixed text style ranges for price labels', async () => {
   assert.equal(price.textStyleRanges[1].fontWeight, 400);
 });
 
-test('parser keeps invalid repeated UI geometry absolute while preserving valid route flow', async () => {
+test('parser infers flex layouts for repeated UI groups', async () => {
   const { layers } = await loadSampleLayers();
   const all = flatten(layers);
   const footer = all.find(node => node.name === 'footer');
   const route = all.find(node => node.name === '路线' && node.layoutHint?.mode === 'flex-row');
 
-  assert.equal(footer?.layoutHint, undefined, 'active footer item cannot retain its source y-coordinate in one flex row');
+  assert.ok(footer?.layoutHint, 'expected footer layout hint');
+  assert.equal(footer.layoutHint.mode, 'flex-row');
+  assert.ok((footer.layoutHint.itemIds || []).length >= 4);
   assert.ok(route?.layoutHint, 'expected route group layout hint');
-  assert.equal(route.layoutHint.justifyContent, 'start');
-  assert.ok((route.layoutHint.gap || 0) > 0);
 });
 
 test('parser marks text-only groups as content-sized', async () => {
@@ -227,158 +190,4 @@ test('parser does not infer flex layouts inside asset-backed icon groups', async
   assert.equal(tabIcon.renderStrategy, 'asset');
   assert.equal(tabIcon.layoutHint, undefined);
   assert.equal(restoration.flexContainerIds.includes(24580), false);
-});
-
-test('parser normalizes unit-object text metrics without leaking invalid numeric output', () => {
-  const parser = new LanhuParser();
-  const document = parser.parseDocument({
-    board: {
-      id: 1,
-      type: 'artboardSection',
-      name: 'Text metrics',
-      visible: true,
-      clipped: false,
-      artboard: {
-        artboardRect: { top: 0, left: 0, bottom: 200, right: 400 },
-      },
-      layers: [
-        {
-          id: 2,
-          type: 'textLayer',
-          name: 'Framed paragraph',
-          visible: true,
-          clipped: false,
-          text: true,
-          boundsWithFX: { top: 20, left: 30, bottom: 100, right: 330 },
-          textInfo: {
-            text: 'Framed paragraph text',
-            justification: 'center',
-            size: { value: 24, units: 'pointsUnit' },
-            leading: { value: 30, units: 'pointsUnit' },
-            tracking: { value: 20, units: 'pointsUnit' },
-            baselineShift: { value: 2, units: 'pointsUnit' },
-            horizontalScale: { value: 100, units: 'percentUnit' },
-            verticalScale: { value: 98, units: 'percentUnit' },
-            _orgTransform: {
-              xx: { value: 1, units: 'unitless' },
-              xy: 0,
-              yx: 0,
-              yy: { value: 0.98, units: 'unitless' },
-              tx: 0,
-              ty: 0,
-            },
-            bounds: {
-              top: { value: 0, units: 'pixelsUnit' },
-              left: { value: 0, units: 'pixelsUnit' },
-              bottom: { value: 80, units: 'pixelsUnit' },
-              right: { value: 300, units: 'pixelsUnit' },
-            },
-            boundingBox: {
-              top: { value: 4, units: 'pixelsUnit' },
-              left: { value: 12, units: 'pixelsUnit' },
-              bottom: { value: 64, units: 'pixelsUnit' },
-              right: { value: 288, units: 'pixelsUnit' },
-            },
-            textShape: [{ char: 'box', frameBaselineAlignment: 'alignByAscent' }],
-            textStyleRange: [
-              {
-                from: { value: 0, units: 'characters' },
-                to: { value: 6, units: 'characters' },
-                textStyle: {
-                  size: { value: 24, units: 'pointsUnit' },
-                  fontName: 'Example Sans',
-                },
-              },
-              {
-                from: { value: Number.NaN, units: 'characters' },
-                to: { value: 10, units: 'characters' },
-                textStyle: {
-                  size: { value: Number.POSITIVE_INFINITY, units: 'pointsUnit' },
-                },
-              },
-            ],
-          },
-        },
-      ],
-    },
-  });
-
-  const [textNode] = parser.buildLayerTree(document, 5, {
-    includeInvisible: false,
-    normalizeToArtboard: true,
-  });
-
-  assert.equal(textNode.textStyle?.fontSize, 24);
-  assert.equal(textNode.textStyle?.lineHeight, 30);
-  assert.equal(textNode.textStyle?.letterSpacing, 0.48);
-  assert.equal(textNode.textMetrics?.relativeBounds?.width, 300);
-  assert.equal(textNode.textMetrics?.relativeBoundingBox?.height, 60);
-  assert.equal(textNode.textMetrics?.baselineShift, 2);
-  assert.equal(textNode.textMetrics?.horizontalScale, 100);
-  assert.equal(textNode.textMetrics?.verticalScale, 98);
-  assert.equal(textNode.textMetrics?.transformScaleY, 0.98);
-  assert.equal(textNode.textMetrics?.frameKind, 'paragraph');
-  assert.equal(textNode.sizeHint?.width, 'fixed');
-  assert.equal(textNode.sizeHint?.height, 'fixed');
-  assert.deepEqual(textNode.textStyleRanges?.map(range => [range.from, range.to, range.fontSize]), [[0, 6, 24]]);
-
-  const serialized = JSON.stringify(textNode);
-  assert.doesNotMatch(serialized, /\[object Object\]|NaN|Infinity|"(?:width|height|fontSize)":null/);
-});
-
-test('parser accepts only flex spacing that reproduces source coordinates', () => {
-  const parser = new LanhuParser();
-  const makeChild = (id, left) => ({
-    id,
-    type: 'shapeLayer',
-    name: `item-${id}`,
-    visible: true,
-    clipped: false,
-    bounds: { top: 20, left, bottom: 40, right: left + 20 },
-    fill: { color: { red: 0, green: 0, blue: 0 } },
-  });
-  const document = parser.parseDocument({
-    board: {
-      id: 1,
-      type: 'artboardSection',
-      name: 'Flex geometry',
-      visible: true,
-      clipped: false,
-      artboard: {
-        artboardRect: { top: 0, left: 0, bottom: 100, right: 300 },
-      },
-      layers: [
-        {
-          id: 10,
-          type: 'layerSection',
-          name: 'uniform',
-          visible: true,
-          clipped: false,
-          bounds: { top: 10, left: 10, bottom: 50, right: 150 },
-          layers: [makeChild(11, 20), makeChild(12, 60), makeChild(13, 100)],
-        },
-        {
-          id: 20,
-          type: 'layerSection',
-          name: 'uneven',
-          visible: true,
-          clipped: false,
-          bounds: { top: 10, left: 160, bottom: 50, right: 300 },
-          layers: [makeChild(21, 170), makeChild(22, 207), makeChild(23, 260)],
-        },
-      ],
-    },
-  });
-
-  const layers = parser.buildLayerTree(document, 5, {
-    includeInvisible: false,
-    normalizeToArtboard: true,
-  });
-  const uniform = layers.find(node => node.name === 'uniform');
-  const uneven = layers.find(node => node.name === 'uneven');
-
-  assert.equal(uniform?.layoutHint?.mode, 'flex-row');
-  assert.equal(uniform.layoutHint.justifyContent, 'start');
-  assert.equal(uniform.layoutHint.gap, 20);
-  assert.equal(uneven?.layoutHint, undefined);
 });

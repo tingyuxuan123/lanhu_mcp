@@ -29,7 +29,6 @@ async function loadRuntimeDependencies() {
     { AssetLocalizer },
     { LanhuClient },
     { LanhuParser },
-    { buildLayoutRenderModel },
     { imageCompareService },
     { buildAssetPublicPath },
     { normalizeLanhuAssetUrl },
@@ -38,7 +37,6 @@ async function loadRuntimeDependencies() {
     importRuntimeModule(['../services/asset-localizer.js', '../../dist/services/asset-localizer.js']),
     importRuntimeModule(['../services/lanhu-client.js', '../../dist/services/lanhu-client.js']),
     importRuntimeModule(['../services/lanhu-parser.js', '../../dist/services/lanhu-parser.js']),
-    importRuntimeModule(['../services/layout-model.js', '../../dist/services/layout-model.js']),
     importRuntimeModule(['../services/image-compare.js', '../../dist/services/image-compare.js']),
     importRuntimeModule(['../utils/asset-localization.js', '../../dist/utils/asset-localization.js']),
     importRuntimeModule(['../utils/lanhu-resource-url.js', '../../dist/utils/lanhu-resource-url.js']),
@@ -49,7 +47,6 @@ async function loadRuntimeDependencies() {
     AssetLocalizer,
     LanhuClient,
     LanhuParser,
-    buildLayoutRenderModel,
     imageCompareService,
     buildAssetPublicPath,
     normalizeLanhuAssetUrl,
@@ -62,7 +59,6 @@ const {
   AssetLocalizer,
   LanhuClient,
   LanhuParser,
-  buildLayoutRenderModel,
   imageCompareService,
   buildAssetPublicPath,
   normalizeLanhuAssetUrl,
@@ -73,9 +69,7 @@ const cookie = options.cookie ?? (process.env.LANHU_COOKIE || '');
 const directJsonUrl = normalizeLanhuAssetUrl(options.jsonUrl ?? process.env.LANHU_JSON_URL ?? '');
 const directReferenceImageUrl = normalizeLanhuAssetUrl(options.referenceImageUrl ?? process.env.LANHU_REFERENCE_IMAGE_URL ?? '') || null;
 const jsonPath = pageUrl || directJsonUrl ? null : path.resolve(options.jsonPath || process.env.SAMPLE_JSON_PATH || 'tmp_sample.json');
-const configuredReferenceImagePath = pageUrl || directJsonUrl || directReferenceImageUrl
-  ? null
-  : path.resolve(options.referenceImagePath || process.env.SAMPLE_REFERENCE_PATH || 'tmp_sample.png');
+const referenceImagePath = pageUrl || directReferenceImageUrl ? null : path.resolve(options.referenceImagePath || process.env.SAMPLE_REFERENCE_PATH || 'tmp_sample.png');
 const outputDir = path.resolve(
   options.outputDir
   || process.env.LANHU_OUTPUT_DIR
@@ -97,14 +91,14 @@ if (pageUrl && !cookie) {
 let document;
 let sourceMeta;
 let referenceImageUrl = directReferenceImageUrl;
-let localReferenceImagePath = configuredReferenceImagePath;
+let localReferenceImagePath = referenceImagePath;
 let lanhuClient = cookie ? new LanhuClient(cookie) : null;
 
 if (pageUrl) {
   const imageInfo = await lanhuClient.getImageInfo(parseLanhuUrl(pageUrl));
   const latestVersion = lanhuClient.getLatestVersion(imageInfo);
   document = await lanhuClient.fetchSketchJson(latestVersion.json_url);
-  referenceImageUrl = referenceImageUrl || latestVersion.url || imageInfo.url;
+  referenceImageUrl = referenceImageUrl || imageInfo.url || latestVersion.url;
   sourceMeta = {
     mode: 'page_url',
     pageUrl,
@@ -117,18 +111,23 @@ if (pageUrl) {
     referenceImageUrl,
   };
 } else if (directJsonUrl) {
-  const response = await fetch(directJsonUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      Accept: 'application/json, text/plain, */*',
-    },
-  });
+  if (lanhuClient) {
+    document = await lanhuClient.fetchSketchJson(directJsonUrl);
+  } else {
+    const response = await fetch(directJsonUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        Accept: 'application/json, text/plain, */*',
+      },
+    });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Lanhu JSON: ${response.status} ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch Lanhu JSON: ${response.status} ${response.statusText}`);
+    }
+
+    document = await response.json();
   }
 
-  document = await response.json();
   sourceMeta = {
     mode: 'json_url',
     jsonUrl: directJsonUrl,
@@ -140,8 +139,8 @@ if (pageUrl) {
   sourceMeta = {
     mode: 'local_sample',
     jsonPath,
-    imagePath: configuredReferenceImagePath,
-    referenceImagePath: configuredReferenceImagePath,
+    imagePath: referenceImagePath,
+    referenceImagePath,
   };
 }
 
@@ -156,12 +155,10 @@ if (referenceImageUrl && lanhuClient) {
 const parser = new LanhuParser();
 const parsed = parser.parseDocument(document);
 const artboard = parser.getArtboardInfo(parsed);
-const parsedLayers = parser.buildLayerTree(parsed, 30, {
+const layers = parser.buildLayerTree(parsed, 30, {
   includeInvisible: false,
   normalizeToArtboard: true,
 });
-const layoutModel = buildLayoutRenderModel(parsedLayers);
-const layers = layoutModel.nodes;
 const assets = parser.extractAssets(parsed, {
   includeInvisible: false,
   normalizeToArtboard: true,
@@ -321,7 +318,7 @@ function resolveReferenceImageExtension(sourceUrl, contentType) {
       return extension;
     }
   } catch {
-    // Use a stable extension when the source is not a parseable URL.
+    return '.png';
   }
 
   return '.png';
@@ -361,7 +358,6 @@ function hasOwnVisual(node) {
 
 function isRenderable(node) {
   if (!node.visible) return false;
-  if (!node.bounds || !Number.isFinite(node.bounds.width) || !Number.isFinite(node.bounds.height)) return false;
   if (node.bounds.width <= 0 || node.bounds.height <= 0) return false;
   if (node.intersectsArtboard === false) return false;
   return true;
@@ -395,18 +391,6 @@ function hasBitmapFallback(node) {
     || (node.name === 'Path' && node.bounds.y <= 40 && node.bounds.width >= 600);
 }
 
-function finiteNumber(value, fallback = 0) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
-function finiteOptionalNumber(value) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
-function pixelValue(value, fallback = 0) {
-  return `${finiteNumber(value, fallback)}px`;
-}
-
 function radiusValue(node) {
   if (node.shapeType === 'ellipse') {
     return '9999px';
@@ -415,12 +399,9 @@ function radiusValue(node) {
     return '';
   }
   if (Array.isArray(node.borderRadius)) {
-    if (node.borderRadius.some(value => finiteOptionalNumber(value) === undefined)) {
-      return '';
-    }
-    return node.borderRadius.map(value => pixelValue(value)).join(' ');
+    return node.borderRadius.map(value => `${value}px`).join(' ');
   }
-  return finiteOptionalNumber(node.borderRadius) === undefined ? '' : pixelValue(node.borderRadius);
+  return `${node.borderRadius}px`;
 }
 
 function boxShadowValue(node) {
@@ -428,7 +409,7 @@ function boxShadowValue(node) {
     return '';
   }
   return node.shadows
-    .map(shadow => `${shadow.type === 'innerShadow' ? 'inset ' : ''}${pixelValue(shadow.x)} ${pixelValue(shadow.y)} ${pixelValue(shadow.blur)} ${pixelValue(shadow.spread)} ${shadow.color}`)
+    .map(shadow => `${shadow.type === 'innerShadow' ? 'inset ' : ''}${shadow.x}px ${shadow.y}px ${shadow.blur}px ${shadow.spread}px ${shadow.color}`)
     .join(',');
 }
 
@@ -456,37 +437,33 @@ function boxStyles(node, {
     }
     styles.push('flex:0 0 auto');
   } else {
-    const boundsX = finiteNumber(node.bounds.x);
-    const boundsY = finiteNumber(node.bounds.y);
-    const boundsWidth = finiteNumber(node.bounds.width);
-    let left = boundsX - finiteNumber(offsetX);
+    let left = node.bounds.x - offsetX;
     if ((node.text || node.isTextOnlyContainer) && node.sizeHint?.width === 'content') {
       if (node.textStyle?.alignment === 'center') {
-        left = boundsX + boundsWidth / 2 - finiteNumber(offsetX);
+        left = node.bounds.x + node.bounds.width / 2 - offsetX;
         transforms.push('translateX(-50%)');
       } else if (node.textStyle?.alignment === 'right') {
-        left = boundsX + boundsWidth - finiteNumber(offsetX);
+        left = node.bounds.x + node.bounds.width - offsetX;
         transforms.push('translateX(-100%)');
       }
     }
     styles.push('position:absolute');
-    styles.push(`left:${pixelValue(left)}`);
-    styles.push(`top:${pixelValue(boundsY - finiteNumber(offsetY))}`);
+    styles.push(`left:${left}px`);
+    styles.push(`top:${node.bounds.y - offsetY}px`);
   }
 
   const shouldOmitWidth = omitWidth ?? (node.sizeHint?.width === 'content');
   const shouldOmitHeight = omitHeight ?? (node.sizeHint?.height === 'content');
 
   if (!shouldOmitWidth) {
-    styles.push(`width:${pixelValue(node.bounds.width)}`);
+    styles.push(`width:${node.bounds.width}px`);
   }
   if (!shouldOmitHeight) {
-    styles.push(`height:${pixelValue(node.bounds.height)}`);
+    styles.push(`height:${node.bounds.height}px`);
   }
 
-  const opacity = finiteOptionalNumber(node.opacity);
-  if (opacity !== undefined) {
-    styles.push(`opacity:${opacity}`);
+  if (node.opacity !== undefined) {
+    styles.push(`opacity:${node.opacity}`);
   }
 
   if (includeVisual) {
@@ -498,7 +475,7 @@ function boxStyles(node, {
     }
 
     if (visualNode.stroke) {
-      styles.push(`border:${pixelValue(visualNode.stroke.width)} solid ${visualNode.stroke.color}`);
+      styles.push(`border:${visualNode.stroke.width}px solid ${visualNode.stroke.color}`);
     }
 
     const radius = radiusValue(visualNode);
@@ -512,15 +489,13 @@ function boxStyles(node, {
     }
   }
 
-  const transformScaleX = finiteOptionalNumber(node.textMetrics?.transformScaleX);
-  const transformScaleY = finiteOptionalNumber(node.textMetrics?.transformScaleY);
-  if (transformScaleX !== undefined && Math.abs(transformScaleX - 1) > 0.001) {
-    const scaleY = transformScaleY !== undefined && Math.abs(transformScaleY - 1) > 0.001
-      ? ` scaleY(${transformScaleY})`
+  if (node.textMetrics?.transformScaleX && Math.abs(node.textMetrics.transformScaleX - 1) > 0.001) {
+    const scaleY = node.textMetrics.transformScaleY && Math.abs(node.textMetrics.transformScaleY - 1) > 0.001
+      ? ` scaleY(${node.textMetrics.transformScaleY})`
       : '';
-    transforms.push(`scaleX(${transformScaleX})${scaleY}`);
-  } else if (transformScaleY !== undefined && Math.abs(transformScaleY - 1) > 0.001) {
-    transforms.push(`scaleY(${transformScaleY})`);
+    transforms.push(`scaleX(${node.textMetrics.transformScaleX})${scaleY}`);
+  } else if (node.textMetrics?.transformScaleY && Math.abs(node.textMetrics.transformScaleY - 1) > 0.001) {
+    transforms.push(`scaleY(${node.textMetrics.transformScaleY})`);
   }
 
   if (forceClip) {
@@ -631,69 +606,73 @@ function getVisualFillValue(visualNode) {
 }
 
 function resolveLineHeight(node, style, singleLine) {
-  const explicitLineHeight = finiteOptionalNumber(style.lineHeight);
-  if (explicitLineHeight !== undefined && explicitLineHeight > 0) {
-    return pixelValue(explicitLineHeight);
+  if (style.lineHeight) {
+    return `${style.lineHeight}px`;
   }
 
-  const fontSize = Math.max(finiteNumber(style.fontSize, 14), 1);
+  const fontSize = style.fontSize || 14;
   if (!singleLine) {
-    return pixelValue(Number((fontSize * 1.2).toFixed(2)));
+    return `${Number((fontSize * 1.2).toFixed(2))}px`;
   }
 
-  const frameHeight = Math.max(finiteNumber(node.bounds.height), 0);
-  const measuredHeight = Math.max(
-    finiteNumber(node.textMetrics?.relativeBoundingBox?.height)
-    || finiteNumber(node.textMetrics?.relativeBounds?.height),
-    0,
-  );
+  const frameHeight = node.bounds.height || 0;
+  const measuredHeight = node.textMetrics?.relativeBoundingBox?.height
+    || node.textMetrics?.relativeBounds?.height
+    || 0;
   const preferredHeight = frameHeight || measuredHeight || fontSize;
   const fallback = Math.max(
     Math.min(preferredHeight, Number((fontSize * 1.2).toFixed(2))),
     Math.min(fontSize * 0.72, preferredHeight),
   );
 
-  return pixelValue(Number(fallback.toFixed(2)));
+  return `${Number(fallback.toFixed(2))}px`;
+}
+
+function shouldPreserveFlowTextWidth(node, style, mode) {
+  if (mode !== 'flow') {
+    return false;
+  }
+
+  if (style.alignment === 'center' || style.alignment === 'right') {
+    return true;
+  }
+
+  const boundingWidth = node.textMetrics?.relativeBoundingBox?.width || 0;
+  return boundingWidth > 0 && node.bounds.width - boundingWidth >= 6;
 }
 
 function textContainerStyles(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
   const style = node.textStyle || {};
-  const contentSizedPointText = node.sizeHint?.width === 'content'
-    && node.textMetrics?.frameKind !== 'paragraph'
-    && !String(node.text || '').includes('\n');
-  const preserveFrameWidth = !contentSizedPointText;
-  const preserveFrameHeight = node.sizeHint?.height !== 'content';
-  const fontSize = Math.max(finiteNumber(style.fontSize, 14), 1);
-  const fontWeight = finiteNumber(style.fontWeight, 400);
+  const singleLine = !String(node.text || '').includes('\n');
+  const preserveFlowWidth = shouldPreserveFlowTextWidth(node, style, mode);
   const styles = [
     boxStyles(node, {
       offsetX,
       offsetY,
       forceClip: false,
       mode,
-      omitWidth: !preserveFrameWidth,
-      omitHeight: !preserveFrameHeight,
+      omitWidth: !preserveFlowWidth,
+      omitHeight: true,
       includeVisual: false,
     }),
-    `white-space:${contentSizedPointText ? 'nowrap' : 'pre-wrap'}`,
-    `word-break:${contentSizedPointText ? 'keep-all' : 'break-word'}`,
+    `white-space:${singleLine ? 'nowrap' : 'pre-wrap'}`,
+    `word-break:${singleLine ? 'keep-all' : 'break-word'}`,
     'overflow:visible',
     'background:transparent',
-    `display:${contentSizedPointText ? 'inline-block' : 'block'}`,
-    `font-size:${pixelValue(fontSize)}`,
+    'display:inline-block',
+    `font-size:${style.fontSize || 14}px`,
     `font-family:'${style.fontFamily || 'sans-serif'}','Microsoft YaHei','PingFang SC',sans-serif`,
-    `font-weight:${fontWeight}`,
+    `font-weight:${style.fontWeight || 400}`,
     `font-style:${style.fontStyle || 'normal'}`,
     `color:${style.color || '#000000'}`,
     `text-align:${style.alignment || 'left'}`,
     'max-width:none',
   ];
 
-  styles.push(`line-height:${resolveLineHeight(node, style, contentSizedPointText)}`);
+  styles.push(`line-height:${resolveLineHeight(node, style, singleLine)}`);
 
-  const letterSpacing = finiteOptionalNumber(style.letterSpacing);
-  if (letterSpacing !== undefined) {
-    styles.push(`letter-spacing:${pixelValue(letterSpacing)}`);
+  if (style.letterSpacing !== undefined) {
+    styles.push(`letter-spacing:${style.letterSpacing}px`);
   }
 
   return styles.join(';');
@@ -720,11 +699,9 @@ function assetWrapperStyles(node, offsetX = 0, offsetY = 0, mode = 'absolute') {
 
 function stylesForRange(range) {
   const styles = [];
-  const fontSize = finiteOptionalNumber(range.fontSize);
-  const fontWeight = finiteOptionalNumber(range.fontWeight);
-  if (fontSize !== undefined && fontSize > 0) styles.push(`font-size:${pixelValue(fontSize)}`);
+  if (range.fontSize) styles.push(`font-size:${range.fontSize}px`);
   if (range.fontFamily) styles.push(`font-family:'${range.fontFamily}','PingFang SC','Microsoft YaHei',sans-serif`);
-  if (fontWeight !== undefined) styles.push(`font-weight:${fontWeight}`);
+  if (range.fontWeight) styles.push(`font-weight:${range.fontWeight}`);
   if (range.fontStyle) styles.push(`font-style:${range.fontStyle}`);
   if (range.color) styles.push(`color:${range.color}`);
   return styles.join(';');
@@ -926,8 +903,8 @@ function renderEllipseDotsShape(node, ellipseBounds, offsetX = 0, offsetY = 0, m
   const fill = node.fill || '#000000';
   const dotsHtml = ellipseBounds.map(bounds => {
     const dotStyle = [
-      `width:${pixelValue(bounds.width)}`,
-      `height:${pixelValue(bounds.height)}`,
+      `width:${bounds.width}px`,
+      `height:${bounds.height}px`,
       `background:${fill}`,
       'border-radius:9999px',
       'flex:0 0 auto',
@@ -946,14 +923,14 @@ function renderEllipseRingShape(node, ringLayout, offsetX = 0, offsetY = 0, mode
     'display:flex',
     'align-items:center',
     'justify-content:center',
-    `border:${pixelValue(ringLayout.ringThickness)} solid ${fill}`,
+    `border:${ringLayout.ringThickness}px solid ${fill}`,
     'border-radius:9999px',
     'box-sizing:border-box',
     'background:transparent',
   ].join(';');
   const dotStyle = [
-    `width:${pixelValue(ringLayout.centerBounds.width)}`,
-    `height:${pixelValue(ringLayout.centerBounds.height)}`,
+    `width:${ringLayout.centerBounds.width}px`,
+    `height:${ringLayout.centerBounds.height}px`,
     `background:${fill}`,
     'border-radius:9999px',
     'flex:0 0 auto',
@@ -1975,7 +1952,6 @@ function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insi
   const contentChildren = embeddedVisualNode
     ? children.filter(child => child.id !== embeddedVisualNode.id)
     : children;
-  // Containers only use source-coordinate layout unless the shared model emits a layoutHint.
   const simpleFlow = null;
   const detachedFlow = null;
   const maskedFlow = null;
@@ -2035,7 +2011,7 @@ function flexLayoutStyles(node, mode = 'absolute') {
     `flex-direction:${layout.mode === 'flex-row' ? 'row' : 'column'}`,
     `justify-content:${toFlexJustify(layout.justifyContent)}`,
     `align-items:${toFlexAlign(layout.alignItems)}`,
-    `gap:${layout.lines?.length || layout.justifyContent === 'space-between' ? 0 : finiteNumber(layout.gap)}px`,
+    `gap:${layout.lines?.length ? 0 : layout.gap || 0}px`,
     'box-sizing:border-box',
   ];
 
@@ -2188,9 +2164,7 @@ function renderLayoutLines(node, insideMask = false) {
       items.length > 1 ? 'flex-direction:row' : '',
       items.length > 1 ? `justify-content:${toFlexJustify(line.justifyContent)}` : '',
       items.length > 1 ? `align-items:${toFlexAlign(line.alignItems)}` : '',
-      items.length > 1 && line.justifyContent !== 'space-between'
-        ? `gap:${pixelValue(line.gap)}`
-        : '',
+      items.length > 1 ? `gap:${line.gap || 0}px` : '',
       'box-sizing:border-box',
     ];
 
@@ -2247,40 +2221,24 @@ function renderFlexNode(node, offsetX = 0, offsetY = 0, mode = 'absolute', insid
   const { items, overlays } = getLayoutChildren(node);
   const visualNode = getContainerVisualNode(node);
   const embeddedVisualNode = canEmbedVisualNode(node, visualNode) ? visualNode : undefined;
-  const visibleOverlays = overlays.filter(child => child.id !== embeddedVisualNode?.id);
-  const { backgroundOverlays, foregroundOverlays } = splitFlexOverlayChildren(node, visibleOverlays);
-  const usesOverlayGrid = backgroundOverlays.length > 0;
-  const preciseFlowLayout = shouldUsePreciseFlexFlowLayout(node, items, mode);
+  const children = [
+    ...items,
+    ...overlays.filter(child => child.id !== embeddedVisualNode?.id),
+  ];
   const wrapperStyle = [
     boxStyles(node, {
       offsetX,
       offsetY,
       mode,
-      positionContext: mode === 'flow' && (usesOverlayGrid || foregroundOverlays.length > 0 || preciseFlowLayout),
+      positionContext: mode === 'flow',
       forceClip: false,
       visualNode: embeddedVisualNode || node,
     }),
     embeddedVisualNode ? shapeClipStyles(embeddedVisualNode, node.bounds) : '',
-    usesOverlayGrid
-      ? flexOverlayGridStyles()
-      : preciseFlowLayout
-        ? preciseFlowLayerStyles()
-        : flexLayoutStyles(node, mode),
   ].filter(Boolean).join(';');
-  const flowContentHtml = node.layoutHint?.lines?.length
-    ? renderLayoutLines(node, insideMask)
-    : preciseFlowLayout
-      ? renderPreciselyPositionedChildren(node.bounds, items, insideMask)
-    : items.map(child => renderFlowNode(child)).join('\n');
-  const backgroundHtml = usesOverlayGrid
-    ? `<div ${renderClassAttr('flex-background-layer', 'flex-background-layer', flexOverlayLayerStyles(0))}>${renderLayerList(backgroundOverlays, node.bounds.x, node.bounds.y, 'absolute', false)}</div>`
-    : '';
-  const flowHtml = usesOverlayGrid
-    ? `<div ${renderClassAttr('flex-content-layer', 'flex-content-layer', preciseFlowLayout ? preciseGridContentLayerStyles() : flexContentLayerStyles(node))}>${flowContentHtml}</div>`
-    : flowContentHtml;
-  const overlayHtml = renderLayerList(foregroundOverlays, node.bounds.x, node.bounds.y, 'absolute', false);
+  const childrenHtml = renderLayerList(children, node.bounds.x, node.bounds.y, 'absolute', insideMask);
 
-  return `<div ${renderClassAttr('layer flex-node', 'flex-node', wrapperStyle)} ${layerAttrs(node)}>${backgroundHtml}${flowHtml}${overlayHtml}</div>`;
+  return `<div ${renderClassAttr('layer flex-node', 'flex-node', wrapperStyle)} ${layerAttrs(node)}>${childrenHtml}</div>`;
 }
 
 function renderMaskGroup(maskNode, offsetX = 0, offsetY = 0, mode = 'absolute') {
@@ -2475,7 +2433,7 @@ function buildRootFlowRows(nodes) {
   }));
 }
 
-function renderGridPlacedNode(node, mode = 'flow') {
+function renderGridPlacedNode(node, mode = 'flow', stackIndex = 0) {
   const html = renderNode(node, 0, 0, mode, false);
   if (!html) {
     return '';
@@ -2485,6 +2443,9 @@ function renderGridPlacedNode(node, mode = 'flow') {
     'grid-area:1 / 1',
     'align-self:start',
     'justify-self:start',
+    // Each root node owns a stacking context so wide background groups retain source paint order.
+    'position:relative',
+    `z-index:${stackIndex}`,
     Math.abs(node.bounds.y) > 0.01 ? `margin-top:${node.bounds.y}px` : '',
     Math.abs(node.bounds.x) > 0.01 ? `margin-left:${node.bounds.x}px` : '',
   ].filter(Boolean).join(';');
@@ -2525,7 +2486,7 @@ function renderRootFlowContent(nodes) {
 
 function renderRootGridContent(nodes) {
   return sortByPaint(nodes)
-    .map(node => renderGridPlacedNode(node, 'flow'))
+    .map((node, index) => renderGridPlacedNode(node, 'flow', index))
     .filter(Boolean)
     .join('\n');
 }
@@ -2537,7 +2498,7 @@ function renderRoot(nodes) {
   }
 
   const backgroundHtml = sortByPaint(backgrounds)
-    .map(node => renderGridPlacedNode(node, 'flow'))
+    .map((node, index) => renderGridPlacedNode(node, 'flow', index))
     .filter(Boolean)
     .join('\n');
   const contentHtml = renderRootGridContent(contents);
@@ -2647,57 +2608,25 @@ await fs.writeFile(htmlPath, html, 'utf8');
 await fs.writeFile(parsedPath, JSON.stringify({ artboard, restoration, localizedAssets, layers }, null, 2), 'utf8');
 
 const browser = await chromium.launch({ headless: true });
-try {
-  const page = await browser.newPage({
-    viewport: { width: Math.ceil(artboard.width), height: Math.ceil(artboard.height) },
-    deviceScaleFactor: 1,
-  });
-  await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle' });
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    await Promise.all(Array.from(document.images).map(async image => {
-      if (!image.complete) {
-        await Promise.race([
-          new Promise(resolve => {
-            image.addEventListener('load', resolve, { once: true });
-            image.addEventListener('error', resolve, { once: true });
-          }),
-          new Promise(resolve => window.setTimeout(resolve, 5000)),
-        ]);
-      }
-
-      if (typeof image.decode === 'function') {
-        await image.decode().catch(() => undefined);
-      }
-    }));
-  });
-  await page.locator('#artboard').screenshot({ path: screenshotPath });
-} finally {
-  await browser.close();
-}
+const page = await browser.newPage({
+  viewport: { width: Math.ceil(artboard.width), height: Math.ceil(artboard.height) },
+  deviceScaleFactor: 1,
+});
+await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle' });
+await page.locator('#artboard').screenshot({ path: screenshotPath });
+await browser.close();
 
 let compare = null;
-if (localReferenceImagePath || referenceImageUrl) {
-  const compareParams = {
+if (localReferenceImagePath) {
+  compare = await imageCompareService.compare({
     candidateImagePath: screenshotPath,
+    referenceImagePath: localReferenceImagePath,
     diffOutputPath: diffPath,
     resizeCandidate: true,
     mismatchThreshold: 0.08,
     gridRows: 8,
     gridCols: 4,
-  };
-
-  if (localReferenceImagePath) {
-    compare = await imageCompareService.compare({
-      ...compareParams,
-      referenceImagePath: localReferenceImagePath,
-    });
-  } else {
-    compare = await imageCompareService.compare({
-      ...compareParams,
-      referenceImageUrl,
-    });
-  }
+  });
 }
 
 const result = {

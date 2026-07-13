@@ -108,7 +108,22 @@ function normalizeRenderNode(node: SimplifiedLayer, artboard: ArtboardInfo): Sim
     return nextNode.children?.[0] || null;
   }
 
-  return nextNode;
+  const inferredLayout = inferReadableLayout(nextNode, artboard);
+  const inferredNode = inferredLayout && !isSameLayout(nextNode.layoutHint, inferredLayout)
+    ? {
+        ...nextNode,
+        layoutHint: inferredLayout,
+      }
+    : nextNode;
+  const patternLayoutOverride = detectPattern(inferredNode, artboard)?.layoutOverride;
+  if (!patternLayoutOverride || isSameLayout(inferredNode.layoutHint, patternLayoutOverride)) {
+    return inferredNode;
+  }
+
+  return {
+    ...inferredNode,
+    layoutHint: patternLayoutOverride,
+  };
 }
 
 function annotateRenderNode(
@@ -145,7 +160,7 @@ function detectPattern(node: SimplifiedLayer, artboard: ArtboardInfo): PatternMa
 }
 
 function matchTabBar(node: SimplifiedLayer, artboard: ArtboardInfo): PatternMatch | null {
-  const rowNode = semanticLayoutHint(node)?.mode === 'flex-row'
+  const rowNode = node.layoutHint?.mode === 'flex-row'
     ? node
     : (node.children || []).find(child => isTabBarRowCandidate(child, artboard));
   if (!rowNode || !isTabBarRowCandidate(rowNode, artboard)) {
@@ -182,10 +197,10 @@ function matchTabBar(node: SimplifiedLayer, artboard: ArtboardInfo): PatternMatc
 function matchFeatureGrid(node: SimplifiedLayer, artboard: ArtboardInfo): PatternMatch | null {
   const directItems = getLayoutItems(node);
   const rows = (node.children || []).filter(child => isFeatureGridRow(child));
-  const isDirectGrid = semanticLayoutHint(node)?.mode === 'flex-row'
+  const isDirectGrid = node.layoutHint?.mode === 'flex-row'
     && directItems.length >= 3
     && directItems.length <= 5
-    && directItems.filter(item => semanticLayoutHint(item)?.mode === 'flex-column').length >= 3
+    && directItems.filter(item => item.layoutHint?.mode === 'flex-column').length >= 3
     && node.bounds.y < artboard.height * 0.72;
   if (rows.length < 2 && !isDirectGrid) {
     return null;
@@ -349,7 +364,7 @@ function matchPromoCardList(node: SimplifiedLayer): PatternMatch | null {
 }
 
 function matchPageStack(node: SimplifiedLayer, artboard: ArtboardInfo): PatternMatch | null {
-  if (semanticLayoutHint(node)?.mode !== 'flex-column') {
+  if (node.layoutHint?.mode !== 'flex-column') {
     return null;
   }
 
@@ -505,14 +520,14 @@ function getSinglePrimaryFlowChild(node: SimplifiedLayer): SimplifiedLayer | und
 
 function getPromoBodyCandidates(node: SimplifiedLayer): SimplifiedLayer[] {
   return (node.children || [])
-    .filter(child => semanticLayoutHint(child)?.mode === 'flex-column')
+    .filter(child => child.layoutHint?.mode === 'flex-column')
     .filter(child => child.bounds.height >= node.bounds.height * 0.5)
     .sort((left, right) => right.bounds.height - left.bounds.height);
 }
 
 function getStatsPanelItems(node: SimplifiedLayer): SimplifiedLayer[] {
   const items = (node.children || [])
-    .filter(child => semanticLayoutHint(child)?.mode === 'flex-column')
+    .filter(child => child.layoutHint?.mode === 'flex-column')
     .filter(child => child.bounds.width >= node.bounds.width * 0.2)
     .filter(child => child.bounds.height >= node.bounds.height * 0.65);
   if (items.length < 3 || !areSizesSimilar(items, 0.28)) {
@@ -527,7 +542,7 @@ function getStatsPanelItems(node: SimplifiedLayer): SimplifiedLayer[] {
 
 function getRepeatedFlexCards(node: SimplifiedLayer): SimplifiedLayer[] {
   const groups = (node.children || [])
-    .filter(child => semanticLayoutHint(child)?.mode === 'flex-column')
+    .filter(child => child.layoutHint?.mode === 'flex-column')
     .filter(child => child.bounds.width >= node.bounds.width * 0.75)
     .filter(child => child.bounds.height >= 180);
   if (groups.length < 2 || !areSizesSimilar(groups, 0.18)) {
@@ -619,7 +634,7 @@ function shouldPruneNode(node: SimplifiedLayer): boolean {
 }
 
 function shouldFlattenNode(node: SimplifiedLayer): boolean {
-  if (node.layoutHint || node.sourceLayoutHint || node.clip?.clipped || node.clip?.isMask || node.text || node.assetUrl || hasOwnVisual(node)) {
+  if (node.layoutHint || node.clip?.clipped || node.clip?.isMask || node.text || node.assetUrl || hasOwnVisual(node)) {
     return false;
   }
 
@@ -697,13 +712,9 @@ function areSizesSimilar(items: SimplifiedLayer[], toleranceRatio: number): bool
   return widthRatio <= toleranceRatio && heightRatio <= toleranceRatio;
 }
 
-function semanticLayoutHint(node: SimplifiedLayer): SimplifiedLayoutHint | undefined {
-  return node.layoutHint || node.sourceLayoutHint;
-}
-
 function getLayoutItems(node: SimplifiedLayer): SimplifiedLayer[] {
   const orderedChildren = node.children || [];
-  const itemIds = semanticLayoutHint(node)?.itemIds || [];
+  const itemIds = node.layoutHint?.itemIds || [];
   if (itemIds.length === 0) {
     return [];
   }
