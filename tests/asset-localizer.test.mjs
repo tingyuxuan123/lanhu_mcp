@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { AssetLocalizer } from '../dist/services/asset-localizer.js';
 import { StyleExtractor } from '../dist/services/style-extractor.js';
+import { normalizeLanhuAssetUrl } from '../dist/utils/lanhu-resource-url.js';
 
 function createLayer(overrides = {}) {
   return {
@@ -151,6 +152,55 @@ test('AssetLocalizer retries transient download failures before succeeding', asy
   assert.equal(result.failures.length, 0);
   assert.equal(result.downloadedFileCount, 1);
   assert.match(layers[0].assetUrl, /^\.\/assets\/retry-banner-[a-f0-9]{12}\.png$/);
+});
+
+test('normalizes every legacy Lanhu asset host to the canonical CDN', () => {
+  assert.equal(
+    normalizeLanhuAssetUrl('http://alipic.lanhuapp.com/path/icon?version=2'),
+    'https://assets.lanhuapp.com/path/icon?version=2',
+  );
+  assert.equal(
+    normalizeLanhuAssetUrl('https://lanhu-oss-proxy.lanhuapp.com/max_abc123'),
+    'https://assets.lanhuapp.com/max_abc123',
+  );
+  assert.equal(
+    normalizeLanhuAssetUrl('https://example.com/assets/icon.png'),
+    'https://example.com/assets/icon.png',
+  );
+});
+
+test('AssetLocalizer normalizes legacy Lanhu asset hosts before downloading', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lanhu-asset-host-'));
+  const requestedUrls = [];
+  const imageBuffer = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x00,
+  ]);
+  const localizer = new AssetLocalizer(async sourceUrl => {
+    requestedUrls.push(sourceUrl);
+    return {
+      buffer: imageBuffer,
+      contentType: 'image/png',
+    };
+  });
+  const layers = [
+    createLayer({
+      id: 10,
+      assetUrl: 'https://alipic.lanhuapp.com/path/icon?version=2',
+    }),
+  ];
+
+  try {
+    const result = await localizer.localize(layers, [], {
+      outputDir: path.join(tempDir, 'assets'),
+    });
+
+    assert.deepEqual(requestedUrls, ['https://assets.lanhuapp.com/path/icon?version=2']);
+    assert.equal(layers[0].remoteAssetUrl, 'https://assets.lanhuapp.com/path/icon?version=2');
+    assert.equal(result.files[0].sourceUrl, 'https://assets.lanhuapp.com/path/icon?version=2');
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
 });
 
 test('StyleExtractor prefers local asset paths over remote asset URLs', async () => {

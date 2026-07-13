@@ -28,6 +28,7 @@ import type {
   TextLayerSummary,
 } from '../types/lanhu.js';
 import { normalizeFiniteNumber } from '../utils/finite-number.js';
+import { normalizeLanhuAssetUrl } from '../utils/lanhu-resource-url.js';
 import { logger } from '../utils/logger.js';
 
 export class LanhuParser {
@@ -116,7 +117,8 @@ export class LanhuParser {
         ?? (gradientFill ? this.gradientToCss(gradientFill) : undefined);
       const assetUrls = this.getAssetUrls(layer);
       const boundsMetadata = this.getBoundsMetadata(layer, artboard, normalizeToArtboard)!;
-      const bounds = boundsMetadata.visual || boundsMetadata.original || boundsMetadata.frame;
+      const layoutBounds = boundsMetadata.original || boundsMetadata.path || boundsMetadata.frame;
+      const bounds = boundsMetadata.visual || layoutBounds;
       const shapeMetadata = this.getShapeMetadata(layer);
       const assetUrl = this.pickBestAssetUrl(assetUrls);
       const renderStrategy = this.getRenderStrategy(layer, assetUrl);
@@ -134,6 +136,7 @@ export class LanhuParser {
         parentId,
         depth,
         zIndex: zIndex++,
+        layoutBounds,
         bounds,
         boundsMetadata,
         intersectsArtboard: this.intersectsArtboard(bounds, artboard),
@@ -1784,7 +1787,11 @@ export class LanhuParser {
       ...(layer.ddsImages || {}),
     };
 
-    return Object.keys(urls).length > 0 ? urls : undefined;
+    const normalizedUrls = Object.fromEntries(
+      Object.entries(urls).map(([key, url]) => [key, normalizeLanhuAssetUrl(url)]),
+    );
+
+    return Object.keys(normalizedUrls).length > 0 ? normalizedUrls : undefined;
   }
 
   private pickBestAssetUrl(assetUrls?: Record<string, string>): string | undefined {

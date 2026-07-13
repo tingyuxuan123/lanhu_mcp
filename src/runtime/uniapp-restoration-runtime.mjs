@@ -29,6 +29,7 @@ async function loadRuntimeDependencies() {
     { LanhuClient },
     { LanhuParser },
     { buildAssetPublicPath },
+    { normalizeLanhuAssetUrl },
     { parseLanhuUrl },
     { renderUniAppRoot },
   ] = await Promise.all([
@@ -36,6 +37,7 @@ async function loadRuntimeDependencies() {
     importRuntimeModule(['../services/lanhu-client.js', '../../dist/services/lanhu-client.js']),
     importRuntimeModule(['../services/lanhu-parser.js', '../../dist/services/lanhu-parser.js']),
     importRuntimeModule(['../utils/asset-localization.js', '../../dist/utils/asset-localization.js']),
+    importRuntimeModule(['../utils/lanhu-resource-url.js', '../../dist/utils/lanhu-resource-url.js']),
     importRuntimeModule(['../utils/url-parser.js', '../../dist/utils/url-parser.js']),
     importRuntimeModule(['../services/uniapp-renderer.js', '../../dist/services/uniapp-renderer.js']),
   ]);
@@ -45,6 +47,7 @@ async function loadRuntimeDependencies() {
     LanhuClient,
     LanhuParser,
     buildAssetPublicPath,
+    normalizeLanhuAssetUrl,
     parseLanhuUrl,
     renderUniAppRoot,
   };
@@ -56,13 +59,14 @@ export async function runUniAppRestoration(options = {}) {
     LanhuClient,
     LanhuParser,
     buildAssetPublicPath,
+    normalizeLanhuAssetUrl,
     parseLanhuUrl,
     renderUniAppRoot,
   } = await loadRuntimeDependencies();
   const pageUrl = options.pageUrl ?? process.env.LANHU_PAGE_URL;
   const cookie = options.cookie ?? (process.env.LANHU_COOKIE || '');
-  const directJsonUrl = options.jsonUrl ?? process.env.LANHU_JSON_URL;
-  const directReferenceImageUrl = options.referenceImageUrl ?? (process.env.LANHU_REFERENCE_IMAGE_URL || null);
+  const directJsonUrl = normalizeLanhuAssetUrl(options.jsonUrl ?? process.env.LANHU_JSON_URL ?? '');
+  const directReferenceImageUrl = normalizeLanhuAssetUrl(options.referenceImageUrl ?? process.env.LANHU_REFERENCE_IMAGE_URL ?? '') || null;
   const jsonPath = pageUrl || directJsonUrl ? null : path.resolve(options.jsonPath || process.env.SAMPLE_JSON_PATH || 'tmp_sample.json');
   const referenceImagePath = pageUrl || directReferenceImageUrl ? null : path.resolve(options.referenceImagePath || process.env.SAMPLE_REFERENCE_PATH || 'tmp_sample.png');
   const outputDir = path.resolve(

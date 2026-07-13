@@ -8,6 +8,7 @@ import type {
   SimplifiedTextStyle,
   SimplifiedTextStyleRange,
 } from '../types/lanhu.js';
+import { buildLayoutRenderModel } from './layout-model.js';
 import {
   buildUniAppRenderModel,
   type UniAppSemanticMetadata,
@@ -50,7 +51,8 @@ export function renderUniAppRoot(
 ): string {
   const designWidth = normalizeDesignWidth(options.designWidth, artboard.width);
   const componentName = normalizeComponentName(options.componentName || artboard.name || DEFAULT_COMPONENT_NAME);
-  const renderModel = buildUniAppRenderModel(nodes, artboard);
+  const layoutModel = buildLayoutRenderModel(nodes);
+  const renderModel = buildUniAppRenderModel(layoutModel.nodes, artboard);
   const state: RenderState = {
     designWidth,
     componentName,
@@ -659,7 +661,7 @@ function getPromotedAbsoluteChild(node: SimplifiedLayer, context: RenderNodeCont
   if (context.positionMode !== 'absolute') {
     return undefined;
   }
-  if (node.layoutHint || hasOwnVisual(node) || node.clip?.clipped || node.clip?.isMask) {
+  if (node.layoutHint || node.sourceLayoutHint || hasOwnVisual(node) || node.clip?.clipped || node.clip?.isMask) {
     return undefined;
   }
 

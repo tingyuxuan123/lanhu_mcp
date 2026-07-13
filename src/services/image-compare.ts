@@ -1,6 +1,7 @@
 ﻿import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { Jimp, diff as jimpDiff, intToRGBA } from 'jimp';
+import { normalizeLanhuAssetUrl } from '../utils/lanhu-resource-url.js';
 
 type LoadedImage = Awaited<ReturnType<typeof Jimp.read>>;
 
@@ -132,7 +133,7 @@ export class ImageCompareService {
 
   private async loadImage(source: string): Promise<LoadedImage> {
     if (/^https?:\/\//i.test(source)) {
-      const response = await fetch(source, {
+      const response = await fetch(normalizeLanhuAssetUrl(source), {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           Accept: '*/*',

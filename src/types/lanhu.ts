@@ -469,6 +469,18 @@ export interface SimplifiedLayoutHint {
   }>;
 }
 
+export type SimplifiedLayoutDecisionMode = 'absolute' | 'linear-flow' | 'stacked-lines';
+
+export interface SimplifiedLayoutDecision {
+  mode: SimplifiedLayoutDecisionMode;
+  layoutHint?: SimplifiedLayoutHint;
+  evidence: {
+    candidate: 'parser' | 'geometry';
+    residual: number;
+    reason?: string;
+  };
+}
+
 export interface SimplifiedSizeHint {
   width: 'fixed' | 'content';
   height: 'fixed' | 'content';
@@ -486,6 +498,8 @@ export interface SimplifiedLayer {
   parentId?: number;
   depth?: number;
   zIndex?: number;
+  /** Layout geometry remains stable when visual effects expand a layer. */
+  layoutBounds?: SimplifiedBounds;
   bounds: SimplifiedBounds;
   boundsMetadata?: SimplifiedBoundsMetadata;
   intersectsArtboard?: boolean;
@@ -514,7 +528,10 @@ export interface SimplifiedLayer {
   localAssetFilePath?: string;
   renderStrategy?: SimplifiedRenderStrategy;
   shouldRenderChildren?: boolean;
+  /** Parser-provided layout intent kept for semantic classification only. */
+  sourceLayoutHint?: SimplifiedLayoutHint;
   layoutHint?: SimplifiedLayoutHint;
+  layoutDecision?: SimplifiedLayoutDecision;
   sizeHint?: SimplifiedSizeHint;
   isTextOnlyContainer?: boolean;
   containerVisualSourceId?: number;

@@ -29,15 +29,19 @@ async function loadRuntimeDependencies() {
     { AssetLocalizer },
     { LanhuClient },
     { LanhuParser },
+    { buildLayoutRenderModel },
     { imageCompareService },
     { buildAssetPublicPath },
+    { normalizeLanhuAssetUrl },
     { parseLanhuUrl },
   ] = await Promise.all([
     importRuntimeModule(['../services/asset-localizer.js', '../../dist/services/asset-localizer.js']),
     importRuntimeModule(['../services/lanhu-client.js', '../../dist/services/lanhu-client.js']),
     importRuntimeModule(['../services/lanhu-parser.js', '../../dist/services/lanhu-parser.js']),
+    importRuntimeModule(['../services/layout-model.js', '../../dist/services/layout-model.js']),
     importRuntimeModule(['../services/image-compare.js', '../../dist/services/image-compare.js']),
     importRuntimeModule(['../utils/asset-localization.js', '../../dist/utils/asset-localization.js']),
+    importRuntimeModule(['../utils/lanhu-resource-url.js', '../../dist/utils/lanhu-resource-url.js']),
     importRuntimeModule(['../utils/url-parser.js', '../../dist/utils/url-parser.js']),
   ]);
 
@@ -45,8 +49,10 @@ async function loadRuntimeDependencies() {
     AssetLocalizer,
     LanhuClient,
     LanhuParser,
+    buildLayoutRenderModel,
     imageCompareService,
     buildAssetPublicPath,
+    normalizeLanhuAssetUrl,
     parseLanhuUrl,
   };
 }
@@ -56,14 +62,16 @@ const {
   AssetLocalizer,
   LanhuClient,
   LanhuParser,
+  buildLayoutRenderModel,
   imageCompareService,
   buildAssetPublicPath,
+  normalizeLanhuAssetUrl,
   parseLanhuUrl,
 } = await loadRuntimeDependencies();
 const pageUrl = options.pageUrl ?? process.env.LANHU_PAGE_URL;
 const cookie = options.cookie ?? (process.env.LANHU_COOKIE || '');
-const directJsonUrl = options.jsonUrl ?? process.env.LANHU_JSON_URL;
-const directReferenceImageUrl = options.referenceImageUrl ?? (process.env.LANHU_REFERENCE_IMAGE_URL || null);
+const directJsonUrl = normalizeLanhuAssetUrl(options.jsonUrl ?? process.env.LANHU_JSON_URL ?? '');
+const directReferenceImageUrl = normalizeLanhuAssetUrl(options.referenceImageUrl ?? process.env.LANHU_REFERENCE_IMAGE_URL ?? '') || null;
 const jsonPath = pageUrl || directJsonUrl ? null : path.resolve(options.jsonPath || process.env.SAMPLE_JSON_PATH || 'tmp_sample.json');
 const configuredReferenceImagePath = pageUrl || directJsonUrl || directReferenceImageUrl
   ? null
@@ -148,10 +156,12 @@ if (referenceImageUrl && lanhuClient) {
 const parser = new LanhuParser();
 const parsed = parser.parseDocument(document);
 const artboard = parser.getArtboardInfo(parsed);
-const layers = parser.buildLayerTree(parsed, 30, {
+const parsedLayers = parser.buildLayerTree(parsed, 30, {
   includeInvisible: false,
   normalizeToArtboard: true,
 });
+const layoutModel = buildLayoutRenderModel(parsedLayers);
+const layers = layoutModel.nodes;
 const assets = parser.extractAssets(parsed, {
   includeInvisible: false,
   normalizeToArtboard: true,
@@ -1965,16 +1975,13 @@ function renderContainer(node, offsetX = 0, offsetY = 0, mode = 'absolute', insi
   const contentChildren = embeddedVisualNode
     ? children.filter(child => child.id !== embeddedVisualNode.id)
     : children;
-  const simpleFlow = embeddedVisualNode ? simpleContainerContentLayout(node, contentChildren) : null;
-  const detachedFlow = !simpleFlow ? detachedContainerContentLayout(node, contentChildren, insideMask) : null;
-  const maskedFlow = !simpleFlow && !detachedFlow ? simpleMaskedGroupLayout(node, contentChildren) : null;
-  const toggleFlow = !simpleFlow && !detachedFlow && !maskedFlow ? toggleControlFlowLayout(node, contentChildren) : null;
-  const badgeTileFlow = !simpleFlow && !detachedFlow && !maskedFlow && !toggleFlow
-    ? badgeIconTileLayout(node, contentChildren, insideMask)
-    : null;
-  const singleFlow = !simpleFlow && !detachedFlow && !maskedFlow && !toggleFlow && !badgeTileFlow
-    ? singleChildFlowLayout(node, contentChildren)
-    : null;
+  // Containers only use source-coordinate layout unless the shared model emits a layoutHint.
+  const simpleFlow = null;
+  const detachedFlow = null;
+  const maskedFlow = null;
+  const toggleFlow = null;
+  const badgeTileFlow = null;
+  const singleFlow = null;
   const wrapperVisualNode = embeddedVisualNode || maskedFlow?.visualNode || node;
   const usesAbsoluteChildren = mode === 'flow' && contentChildren.length > 0 && node.shouldRenderChildren !== false && (
     (!simpleFlow && !maskedFlow && !toggleFlow && !badgeTileFlow && !singleFlow && !detachedFlow)

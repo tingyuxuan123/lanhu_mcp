@@ -113,8 +113,9 @@ test('renderUniAppRoot emits semantic section classes, trace metadata, and share
   });
 
   assert.match(sfc, /class="section stats-panel box-node absolute-node layout-row" data-node-id="1" data-node-role="stats-panel" data-node-name="数据"/);
-  assert.match(sfc, /class="section-item stats-panel__item box-node flow-node layout-column" data-node-id="2" data-node-role="stats-panel__item"/);
-  assert.match(sfc, /class="section-item stats-panel__item-2 box-node flow-node layout-column" data-node-id="3" data-node-role="stats-panel__item"/);
+  assert.match(sfc, /class="section-item stats-panel__item box-node flow-node" data-node-id="2" data-node-role="stats-panel__item"/);
+  assert.match(sfc, /class="section-item stats-panel__item-2 box-node flow-node" data-node-id="3" data-node-role="stats-panel__item"/);
+  assert.doesNotMatch(sfc, /stats-panel__item[^\"]*[^\"]layout-column/);
   assert.match(sfc, /\.layout-row \{[^}]*display: flex;[^}]*flex-direction: row;/);
   assert.match(sfc, /\.stats-panel \{[^}]*left: 0rpx;[^}]*top: 0rpx;/);
   assert.match(sfc, /\.page \{[^}]*--color-1: #111111;/);
@@ -393,9 +394,10 @@ test('renderUniAppRoot applies readable column layout overrides to recommendatio
     designWidth: 375,
   });
 
-  assert.match(sfc, /class="section recommendation-list box-node absolute-node layout-column" data-node-id="300" data-node-role="recommendation-list"/);
-  assert.match(sfc, /class="section-item recommendation-list__item box-node flow-node layout-column" data-node-id="302" data-node-role="recommendation-list__item"/);
-  assert.match(sfc, /class="section-item recommendation-list__item-2 box-node flow-node layout-column" data-node-id="303" data-node-role="recommendation-list__item"/);
+  assert.match(sfc, /class="section recommendation-list box-node absolute-node" data-node-id="300" data-node-role="recommendation-list"/);
+  assert.match(sfc, /class="section-item recommendation-list__item box-node absolute-node" data-node-id="302" data-node-role="recommendation-list__item"/);
+  assert.match(sfc, /class="section-item recommendation-list__item-2 box-node absolute-node" data-node-id="303" data-node-role="recommendation-list__item"/);
+  assert.doesNotMatch(sfc, /recommendation-list box-node absolute-node layout-column/);
 });
 
 test('renderUniAppRoot does not emit background fills for asset-backed image nodes', () => {

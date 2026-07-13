@@ -1,10 +1,11 @@
-﻿/**
+/**
  * Lanhu API client.
  */
 
 import { ApiError, AuthenticationError, ParseError } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
 import { buildApiUrl, ParsedLanhuUrl } from '../utils/url-parser.js';
+import { normalizeLanhuAssetUrl } from '../utils/lanhu-resource-url.js';
 import type { ImageResult, ImageVersion, LanhuApiResponse, LanhuDocument, UserSettingsResult } from '../types/index.js';
 import { getLatestVersion } from '../types/api.js';
 
@@ -88,8 +89,18 @@ export class LanhuClient {
       throw new ApiError(`Lanhu business error: ${response.msg || response.code}`, 0);
     }
 
-    logger.info(`Fetched design info: ${response.result.name}`);
-    return response.result;
+    const result = {
+      ...response.result,
+      url: normalizeLanhuAssetUrl(response.result.url),
+      versions: response.result.versions.map(version => ({
+        ...version,
+        url: normalizeLanhuAssetUrl(version.url),
+        json_url: normalizeLanhuAssetUrl(version.json_url),
+      })),
+    };
+
+    logger.info(`Fetched design info: ${result.name}`);
+    return result;
   }
 
   async getCurrentTeamId(): Promise<string> {
@@ -132,7 +143,7 @@ export class LanhuClient {
   }
 
   async fetchSketchJson(jsonUrl: string): Promise<LanhuDocument> {
-    const response = await this.request<LanhuDocument>(jsonUrl, {
+    const response = await this.request<LanhuDocument>(normalizeLanhuAssetUrl(jsonUrl), {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       Accept: 'application/json, text/plain, */*',
     });
@@ -148,7 +159,8 @@ export class LanhuClient {
 
   async fetchBinaryWithMetadata(url: string): Promise<{ buffer: Buffer; contentType?: string }> {
     try {
-      const response = await fetch(url, {
+      const resourceUrl = normalizeLanhuAssetUrl(url);
+      const response = await fetch(resourceUrl, {
         method: 'GET',
         headers: {
           ...(this.cookie ? { Cookie: this.cookie } : {}),

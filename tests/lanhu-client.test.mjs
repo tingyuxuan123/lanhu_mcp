@@ -39,7 +39,7 @@ test('LanhuClient.getImageInfo resolves missing team_id from user settings', asy
         result: {
           id: 'image-1',
           name: 'Example',
-          url: 'https://example.com/reference.png',
+          url: 'https://alipic.lanhuapp.com/reference.png?version=1',
           latest_version: 'version-1',
           versions: [
             {
@@ -49,8 +49,8 @@ test('LanhuClient.getImageInfo resolves missing team_id from user settings', asy
               width: 200,
               create_time: 'Thu, 20 Mar 2026 10:00:00 UTC',
               version_info: '版本1',
-              url: 'https://example.com/reference.png',
-              json_url: 'https://example.com/design.json',
+              url: 'https://alipic.lanhuapp.com/reference.png?version=1',
+              json_url: 'https://alipic.lanhuapp.com/design.json',
               d2c_url: null,
               version_layout_data: '{}',
               md5: null,
@@ -105,6 +105,9 @@ test('LanhuClient.getImageInfo resolves missing team_id from user settings', asy
     });
 
     assert.equal(result.id, 'image-1');
+    assert.equal(result.url, 'https://assets.lanhuapp.com/reference.png?version=1');
+    assert.equal(result.versions[0].url, 'https://assets.lanhuapp.com/reference.png?version=1');
+    assert.equal(result.versions[0].json_url, 'https://assets.lanhuapp.com/design.json');
     assert.equal(calls.length, 2);
     assert.match(calls[0].href, /\/api\/account\/user_settings\?settings_type=web_main$/);
     assert.match(calls[1].href, /\/api\/project\/image\?/);
@@ -191,7 +194,7 @@ test('LanhuClient.fetchBinaryWithMetadata authenticates protected reference down
   const expectedBytes = Uint8Array.from([137, 80, 78, 71]);
 
   globalThis.fetch = async (url, init = {}) => {
-    assert.equal(String(url), 'https://lanhuapp.com/protected/reference.png');
+    assert.equal(String(url), 'https://assets.lanhuapp.com/protected/reference.png?version=2');
     assert.equal(init.method, 'GET');
     assert.equal(init.headers.Cookie, 'session=secret-value');
     assert.equal(init.headers.Referer, 'https://lanhuapp.com/web/');
@@ -206,7 +209,7 @@ test('LanhuClient.fetchBinaryWithMetadata authenticates protected reference down
 
   try {
     const client = new LanhuClient('session=secret-value');
-    const result = await client.fetchBinaryWithMetadata('https://lanhuapp.com/protected/reference.png');
+    const result = await client.fetchBinaryWithMetadata('https://alipic.lanhuapp.com/protected/reference.png?version=2');
 
     assert.deepEqual([...result.buffer], [...expectedBytes]);
     assert.equal(result.contentType, 'image/png');

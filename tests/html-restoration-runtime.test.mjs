@@ -80,10 +80,11 @@ test('HTML restoration preserves paragraph frames and emits only finite CSS numb
 test('HTML restoration renders direct JSON URLs without falling back to a sample reference image', async () => {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lanhu-html-direct-json-'));
   const originalFetch = globalThis.fetch;
-  const designJsonUrl = 'https://cdn.example.com/direct-design.json';
+  const designJsonUrl = 'https://alipic.lanhuapp.com/direct-design.json';
+  const normalizedDesignJsonUrl = 'https://assets.lanhuapp.com/direct-design.json';
 
   globalThis.fetch = async url => {
-    assert.equal(String(url), designJsonUrl);
+    assert.equal(String(url), normalizedDesignJsonUrl);
     return new Response(JSON.stringify({
       board: {
         id: 1,
@@ -127,6 +128,7 @@ test('HTML restoration renders direct JSON URLs without falling back to a sample
     const html = await fs.readFile(result.htmlPath, 'utf8');
 
     assert.equal(result.source.mode, 'json_url');
+    assert.equal(result.source.jsonUrl, normalizedDesignJsonUrl);
     assert.equal(result.compare, null);
     assert.match(html, /font-size:20px/);
     assert.doesNotMatch(html, /\[object Object\]|(?:NaN|Infinity|null)(?:px|deg|%)/);

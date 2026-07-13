@@ -61,6 +61,43 @@ test('parser extracts restoration masks and paint order for sample', async () =>
   assert.ok(restoration.clippedLayerIds.length > 0);
 });
 
+test('parser normalizes image source dictionaries to the canonical asset CDN', () => {
+  const parser = new LanhuParser();
+  const document = parser.parseDocument({
+    board: {
+      id: 1,
+      type: 'artboardSection',
+      name: 'Asset URL normalization',
+      visible: true,
+      clipped: false,
+      artboard: {
+        artboardRect: { top: 0, left: 0, bottom: 100, right: 100 },
+      },
+      layers: [
+        {
+          id: 2,
+          type: 'smartObjectLayer',
+          name: 'Remote image',
+          visible: true,
+          clipped: false,
+          pixels: true,
+          boundsWithFX: { top: 0, left: 0, bottom: 20, right: 20 },
+          images: {
+            png_xxxhd: 'https://lanhu-oss-proxy.lanhuapp.com/max_abc123',
+          },
+        },
+      ],
+    },
+  });
+
+  const [node] = parser.buildLayerTree(document, 30);
+  const [asset] = parser.extractAssets(document);
+
+  assert.equal(node.assetUrls?.png_xxxhd, 'https://assets.lanhuapp.com/max_abc123');
+  assert.equal(node.assetUrl, 'https://assets.lanhuapp.com/max_abc123');
+  assert.equal(asset.assetUrls?.png_xxxhd, 'https://assets.lanhuapp.com/max_abc123');
+});
+
 test('parser keeps partially outside nodes that still intersect the artboard', async () => {
   const { layers } = await loadSampleLayers();
   const all = flatten(layers);
